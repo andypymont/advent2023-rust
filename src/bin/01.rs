@@ -5,49 +5,77 @@ struct Digit {
     word: bool,
 }
 
+const NONWORD_DIGITS: [&str; 10] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+
 const WORD_DIGITS: [&str; 10] = [
     "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
 ];
 
-fn parse_digit(line: &str, pos: usize, ch: char) -> Option<Digit> {
-    if let Some(digit) = ch.to_digit(10) {
-        Some(Digit {
-            value: digit,
-            word: false,
-        })
-    } else {
-        let mut word_value: Option<u32> = None;
-        for (value, word) in WORD_DIGITS.iter().enumerate() {
-            if (pos + word.len()) > line.len() {
-                continue;
-            }
+struct LineDigitIterator {
+    line: String,
+    pos: usize,
+}
 
-            if &&line[pos..pos + word.len()] == word {
-                word_value = Some(value.try_into().unwrap_or(0));
+impl LineDigitIterator {
+    fn new(line: &str) -> Self {
+        Self {
+            line: line.to_string(),
+            pos: 0,
+        }
+    }
+
+    fn current_value(&self) -> Option<Digit> {
+        if self.pos >= self.line.len() {
+            return None;
+        }
+
+        let mut current_value = None;
+
+        for (value, word) in NONWORD_DIGITS.iter().enumerate() {
+            if &&self.line[self.pos..=self.pos] == word {
+                let value = value.try_into().unwrap_or(0);
+                current_value = Some(Digit { value, word: false });
                 break;
             }
         }
-        word_value.map(|value| Digit { value, word: true })
+        if current_value.is_none() {
+            for (value, word) in WORD_DIGITS.iter().enumerate() {
+                if (self.pos + word.len()) > self.line.len() {
+                    continue;
+                }
+
+                if &&self.line[self.pos..self.pos + word.len()] == word {
+                    let value = value.try_into().unwrap_or(0);
+                    current_value = Some(Digit { value, word: true });
+                    break;
+                }
+            }
+        }
+
+        current_value
     }
 }
 
-fn digits_in_line(line: &str) -> Vec<Digit> {
-    let mut digits = Vec::new();
+impl Iterator for LineDigitIterator {
+    type Item = Digit;
 
-    for (pos, ch) in line.chars().enumerate() {
-        if let Some(digit) = parse_digit(line, pos, ch) {
-            digits.push(digit);
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.pos < self.line.len() {
+            let digit = self.current_value();
+            self.pos += 1;
+            if digit.is_some() {
+                return digit;
+            }
         }
+        None
     }
-
-    digits
 }
 
 fn calibration_value(line: &str, include_words: bool) -> u32 {
     let mut first: Option<u32> = None;
     let mut latest = 0;
 
-    for digit in digits_in_line(line) {
+    for digit in LineDigitIterator::new(line) {
         if include_words || !digit.word {
             latest = digit.value;
             if first.is_none() {
