@@ -25,7 +25,7 @@ pub fn handle(day: Day, release: bool, time: bool, submit_part: Option<u8>) {
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .spawn()
-        .unwrap();
+        .expect("cargo command failed to start");
 
-    cmd.wait().unwrap();
+    cmd.wait().expect("cargo command failed to execute");
 }

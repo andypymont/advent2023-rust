@@ -27,6 +27,11 @@ impl Display for AocCommandError {
     }
 }
 
+/// # Errors
+///
+/// Will return `AocCommandError` if aoc-cli is not present in environment, could not
+/// be called, could not write output files to the file system, or exits with a
+/// non-zero status.
 pub fn check() -> Result<(), AocCommandError> {
     Command::new("aoc")
         .arg("-V")
@@ -35,6 +40,11 @@ pub fn check() -> Result<(), AocCommandError> {
     Ok(())
 }
 
+/// # Errors
+///
+/// Will return `AocCommandError` if aoc-cli is not present in environment, could not
+/// be called, could not write output files to the file system, or exits with a
+/// non-zero status.
 pub fn read(day: Day) -> Result<Output, AocCommandError> {
     let puzzle_path = get_puzzle_path(day);
 
@@ -51,6 +61,11 @@ pub fn read(day: Day) -> Result<Output, AocCommandError> {
     call_aoc_cli(&args)
 }
 
+/// # Errors
+///
+/// Will return `AocCommandError` if aoc-cli is not present in environment, could not
+/// be called, could not write output files to the file system, or exits with a
+/// non-zero status.
 pub fn download(day: Day) -> Result<Output, AocCommandError> {
     let input_path = get_input_path(day);
     let puzzle_path = get_puzzle_path(day);
@@ -74,6 +89,11 @@ pub fn download(day: Day) -> Result<Output, AocCommandError> {
     Ok(output)
 }
 
+/// # Errors
+///
+/// Will return `AocCommandError` if aoc-cli is not present in environment, could not
+/// be called, could not write output files to the file system, or exits with a
+/// non-zero status.
 pub fn submit(day: Day, part: u8, result: &str) -> Result<Output, AocCommandError> {
     // workaround: the argument order is inverted for submit.
     let mut args = build_args("submit", &[], day);

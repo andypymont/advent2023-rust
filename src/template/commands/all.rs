@@ -17,7 +17,8 @@ pub fn handle(is_release: bool, is_timed: bool) {
         println!("{ANSI_BOLD}Day {day}{ANSI_RESET}");
         println!("------");
 
-        let output = child_commands::run_solution(day, is_timed, is_release).unwrap();
+        let output = child_commands::run_solution(day, is_timed, is_release)
+            .expect("panic during executing day {day}");
 
         if output.is_empty() {
             println!("Not solved.");

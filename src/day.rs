@@ -18,6 +18,7 @@ pub struct Day(u8);
 impl Day {
     /// Creates a [`Day`] from the provided value if it's in the valid range,
     /// returns [`None`] otherwise.
+    #[must_use]
     pub fn new(day: u8) -> Option<Self> {
         if day == 0 || day > 25 {
             return None;
@@ -27,11 +28,13 @@ impl Day {
 
     // Not part of the public API
     #[doc(hidden)]
+    #[must_use]
     pub const fn __new_unchecked(day: u8) -> Self {
         Self(day)
     }
 
     /// Converts the [`Day`] into an [`u8`].
+    #[must_use]
     pub fn into_inner(self) -> u8 {
         self.0
     }
@@ -58,21 +61,21 @@ impl PartialOrd<u8> for Day {
 /* -------------------------------------------------------------------------- */
 
 impl FromStr for Day {
-    type Err = DayFromStrError;
+    type Err = FromStrError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let day = s.parse().map_err(|_| DayFromStrError)?;
-        Self::new(day).ok_or(DayFromStrError)
+        let day = s.parse().map_err(|_| FromStrError)?;
+        Self::new(day).ok_or(FromStrError)
     }
 }
 
 /// An error which can be returned when parsing a [`Day`].
 #[derive(Debug)]
-pub struct DayFromStrError;
+pub struct FromStrError;
 
-impl Error for DayFromStrError {}
+impl Error for FromStrError {}
 
-impl Display for DayFromStrError {
+impl Display for FromStrError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("expecting a day number between 1 and 25")
     }
@@ -81,6 +84,7 @@ impl Display for DayFromStrError {
 /* -------------------------------------------------------------------------- */
 
 /// An iterator that yields every day of advent from the 1st to the 25th.
+#[must_use]
 pub fn all_days() -> AllDays {
     AllDays::new()
 }
@@ -92,6 +96,7 @@ pub struct AllDays {
 
 impl AllDays {
     #[allow(clippy::new_without_default)]
+    #[must_use]
     pub fn new() -> Self {
         Self { current: 1 }
     }
