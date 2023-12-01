@@ -1,7 +1,7 @@
 advent_of_code::solution!(1);
 
 struct Digit {
-    value: u32,
+    value: usize,
     word: bool,
 }
 
@@ -33,7 +33,6 @@ impl LineDigitIterator {
 
         for (value, word) in NONWORD_DIGITS.iter().enumerate() {
             if &&self.line[self.pos..=self.pos] == word {
-                let value = value.try_into().unwrap_or(0);
                 current_value = Some(Digit { value, word: false });
                 break;
             }
@@ -45,7 +44,6 @@ impl LineDigitIterator {
                 }
 
                 if &&self.line[self.pos..self.pos + word.len()] == word {
-                    let value = value.try_into().unwrap_or(0);
                     current_value = Some(Digit { value, word: true });
                     break;
                 }
@@ -71,8 +69,8 @@ impl Iterator for LineDigitIterator {
     }
 }
 
-fn calibration_value(line: &str, include_words: bool) -> u32 {
-    let mut first: Option<u32> = None;
+fn calibration_value(line: &str, include_words: bool) -> usize {
+    let mut first: Option<usize> = None;
     let mut latest = 0;
 
     for digit in LineDigitIterator::new(line) {
@@ -91,12 +89,12 @@ fn calibration_value(line: &str, include_words: bool) -> u32 {
 }
 
 #[must_use]
-pub fn part_one(input: &str) -> Option<u32> {
+pub fn part_one(input: &str) -> Option<usize> {
     Some(input.lines().map(|x| calibration_value(x, false)).sum())
 }
 
 #[must_use]
-pub fn part_two(input: &str) -> Option<u32> {
+pub fn part_two(input: &str) -> Option<usize> {
     Some(input.lines().map(|x| calibration_value(x, true)).sum())
 }
 
