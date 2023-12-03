@@ -59,23 +59,16 @@ impl FromStr for Draw {
         let mut blue = 0;
 
         for colour_draw in text.split(", ") {
-            let mut colour = Err(ParseGameError);
-            let mut quantity = Err(ParseGameError);
-
-            for (ix, part) in colour_draw.split(' ').enumerate() {
-                match ix {
-                    0 => quantity = part.parse().map_err(|_| ParseGameError),
-                    1 => colour = Ok(part),
+            if let Some((qty_str, colour)) = colour_draw.split_once(' ') {
+                let quantity = qty_str.parse().map_err(|_| ParseGameError)?;
+                match colour {
+                    "red" => red = quantity,
+                    "green" => green = quantity,
+                    "blue" => blue = quantity,
                     _ => return Err(ParseGameError),
                 }
-            }
-
-            let quantity = quantity?;
-            match colour? {
-                "red" => red = quantity,
-                "green" => green = quantity,
-                "blue" => blue = quantity,
-                _ => return Err(ParseGameError),
+            } else {
+                return Err(ParseGameError);
             }
         }
 
@@ -87,29 +80,23 @@ impl FromStr for Game {
     type Err = ParseGameError;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        let mut id = Err(ParseGameError);
-        let mut draws = Vec::new();
+        if let Some((id_str, draws_str)) = text.split_once(": ") {
+            if let Some(id_str) = id_str.strip_prefix("Game ") {
+                let id = id_str.parse().map_err(|_| ParseGameError)?;
+                let mut draws = Vec::new();
 
-        for (ix, part) in text.split(": ").enumerate() {
-            match ix {
-                0 => {
-                    if let Some(id_str) = part.strip_prefix("Game ") {
-                        id = id_str.parse().map_err(|_| ParseGameError);
-                    } else {
-                        return Err(ParseGameError);
-                    }
+                for draw_str in draws_str.split("; ") {
+                    let draw = draw_str.parse()?;
+                    draws.push(draw);
                 }
-                1 => {
-                    for draw_str in part.split("; ") {
-                        let draw = draw_str.parse()?;
-                        draws.push(draw);
-                    }
-                }
-                _ => return Err(ParseGameError),
+
+                Ok(Game { id, draws })
+            } else {
+                Err(ParseGameError)
             }
+        } else {
+            Err(ParseGameError)
         }
-
-        id.map(|id| Game { id, draws })
     }
 }
 
