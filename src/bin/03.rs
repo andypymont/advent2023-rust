@@ -1,53 +1,53 @@
-use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
 advent_of_code::solution!(3);
 
-#[derive(Debug, Eq, Hash, PartialEq)]
-struct Point(usize, usize);
+const GRID_SIZE: usize = 142;
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Debug, PartialEq)]
 struct Part {
     number: u32,
-    position: Point,
+    position: usize,
 }
 
 impl Part {
-    fn adjacent_points(&self) -> HashSet<Point> {
-        let mut adjacent = HashSet::new();
+    fn adjacent_points(&self) -> Vec<usize> {
+        let mut adjacent = Vec::new();
 
-        let west = self.position.0 - 1;
-        let east = self.position.0 + self.number.to_string().len();
-        adjacent.insert(Point(west, self.position.1));
-        adjacent.insert(Point(east, self.position.1));
-        for x in west..=east {
-            adjacent.insert(Point(x, self.position.1 - 1));
-            adjacent.insert(Point(x, self.position.1 + 1));
+        let west = self.position - 1;
+        let east = self.position + self.number.to_string().len();
+        adjacent.push(west);
+        adjacent.push(east);
+        for pos in west..=east {
+            adjacent.push(pos - GRID_SIZE);
+            adjacent.push(pos + GRID_SIZE);
         }
         adjacent
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 enum Gear {
+    Empty,
     Single(u32),
     Valid(u32),
-    Overloaded(u32),
+    Overloaded,
 }
 
 impl Gear {
-    fn connect(&self, part_no: u32) -> Self {
+    fn connect(self, part_no: u32) -> Self {
         match self {
+            Self::Empty => Self::Single(part_no),
             Self::Single(ratio) => Self::Valid(ratio * part_no),
-            Self::Valid(ratio) | Self::Overloaded(ratio) => Self::Overloaded(*ratio),
+            Self::Valid(_) | Self::Overloaded => Self::Overloaded,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct Schematic {
-    symbols: HashMap<Point, char>,
-    parts: HashSet<Part>,
+    symbols: [char; GRID_SIZE * GRID_SIZE],
+    parts: Vec<Part>,
 }
 
 impl Schematic {
@@ -56,7 +56,7 @@ impl Schematic {
             if part
                 .adjacent_points()
                 .iter()
-                .any(|pt| self.symbols.contains_key(pt))
+                .any(|pt| self.symbols[*pt] != '.')
             {
                 Some(part.number)
             } else {
@@ -65,35 +65,35 @@ impl Schematic {
         })
     }
 
-    fn gears(&self) -> HashMap<Point, Gear> {
-        let mut gears = HashMap::new();
+    fn total_gear_ratio(&self) -> u32 {
+        let mut grid = [Gear::Empty; GRID_SIZE * GRID_SIZE];
 
         for part in &self.parts {
             for point in part.adjacent_points() {
-                if let Some('*') = self.symbols.get(&point) {
-                    gears
-                        .entry(point)
-                        .and_modify(|gear: &mut Gear| {
-                            *gear = gear.connect(part.number);
-                        })
-                        .or_insert_with(|| Gear::Single(part.number));
+                if self.symbols[point] == '*' {
+                    grid[point] = grid[point].connect(part.number);
                 }
             }
         }
 
-        gears
+        grid.iter()
+            .map(|gear| match gear {
+                Gear::Valid(ratio) => *ratio,
+                _ => 0,
+            })
+            .sum()
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct ParseSchematicError;
 
 impl FromStr for Schematic {
     type Err = ParseSchematicError;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        let mut symbols = HashMap::new();
-        let mut parts = HashSet::new();
+        let mut symbols = ['.'; GRID_SIZE * GRID_SIZE];
+        let mut parts = Vec::new();
 
         for (ix, line) in text.lines().enumerate() {
             let y = ix + 1;
@@ -101,34 +101,26 @@ impl FromStr for Schematic {
             let mut number = 0;
 
             for (ix, ch) in line.chars().enumerate() {
-                let x = ix + 1;
+                let pos = (y * GRID_SIZE) + ix + 1;
                 if let Some(digit) = ch.to_digit(10) {
                     if number_began.is_some() {
                         number = (number * 10) + digit;
                     } else {
-                        number_began = Some(x);
+                        number_began = Some(pos);
                         number = digit;
                     }
                 } else {
-                    if let Some(began_x) = number_began {
-                        parts.insert(Part {
-                            number,
-                            position: Point(began_x, y),
-                        });
+                    if let Some(position) = number_began {
+                        parts.push(Part { number, position });
                         number_began = None;
                         number = 0;
                     }
-                    if ch != '.' {
-                        symbols.insert(Point(x, y), ch);
-                    }
+                    symbols[pos] = ch;
                 }
             }
 
-            if let Some(began_x) = number_began {
-                parts.insert(Part {
-                    number,
-                    position: Point(began_x, y),
-                });
+            if let Some(position) = number_began {
+                parts.push(Part { number, position });
             }
         }
 
@@ -148,19 +140,7 @@ pub fn part_one(input: &str) -> Option<u32> {
 #[must_use]
 pub fn part_two(input: &str) -> Option<u32> {
     if let Ok(schematic) = input.parse::<Schematic>() {
-        Some(
-            schematic
-                .gears()
-                .iter()
-                .filter_map(|(_, gear)| {
-                    if let Gear::Valid(ratio) = gear {
-                        Some(ratio)
-                    } else {
-                        None
-                    }
-                })
-                .sum(),
-        )
+        Some(schematic.total_gear_ratio())
     } else {
         None
     }
@@ -170,128 +150,123 @@ pub fn part_two(input: &str) -> Option<u32> {
 mod tests {
     use super::*;
 
-    fn example_schematic() -> Schematic {
-        let mut symbols = HashMap::new();
-        symbols.insert(Point(4, 2), '*');
-        symbols.insert(Point(7, 4), '#');
-        symbols.insert(Point(4, 5), '*');
-        symbols.insert(Point(6, 6), '+');
-        symbols.insert(Point(4, 9), '$');
-        symbols.insert(Point(6, 9), '*');
+    fn position(x: usize, y: usize) -> usize {
+        (y * GRID_SIZE) + x
+    }
 
-        let mut parts = HashSet::new();
-        parts.insert(Part {
-            number: 467,
-            position: Point(1, 1),
-        });
-        parts.insert(Part {
-            number: 114,
-            position: Point(6, 1),
-        });
-        parts.insert(Part {
-            number: 35,
-            position: Point(3, 3),
-        });
-        parts.insert(Part {
-            number: 633,
-            position: Point(7, 3),
-        });
-        parts.insert(Part {
-            number: 617,
-            position: Point(1, 5),
-        });
-        parts.insert(Part {
-            number: 58,
-            position: Point(8, 6),
-        });
-        parts.insert(Part {
-            number: 592,
-            position: Point(3, 7),
-        });
-        parts.insert(Part {
-            number: 755,
-            position: Point(7, 8),
-        });
-        parts.insert(Part {
-            number: 664,
-            position: Point(2, 10),
-        });
-        parts.insert(Part {
-            number: 598,
-            position: Point(6, 10),
-        });
+    fn example_schematic() -> Schematic {
+        let mut symbols = ['.'; GRID_SIZE * GRID_SIZE];
+        symbols[position(4, 2)] = '*';
+        symbols[position(7, 4)] = '#';
+        symbols[position(4, 5)] = '*';
+        symbols[position(6, 6)] = '+';
+        symbols[position(4, 9)] = '$';
+        symbols[position(6, 9)] = '*';
+
+        let parts = vec![
+            Part {
+                number: 467,
+                position: position(1, 1),
+            },
+            Part {
+                number: 114,
+                position: position(6, 1),
+            },
+            Part {
+                number: 35,
+                position: position(3, 3),
+            },
+            Part {
+                number: 633,
+                position: position(7, 3),
+            },
+            Part {
+                number: 617,
+                position: position(1, 5),
+            },
+            Part {
+                number: 58,
+                position: position(8, 6),
+            },
+            Part {
+                number: 592,
+                position: position(3, 7),
+            },
+            Part {
+                number: 755,
+                position: position(7, 8),
+            },
+            Part {
+                number: 664,
+                position: position(2, 10),
+            },
+            Part {
+                number: 598,
+                position: position(6, 10),
+            },
+        ];
 
         Schematic { symbols, parts }
     }
 
     #[test]
     fn test_parse_schematic() {
-        let parsed: Schematic = advent_of_code::template::read_file("examples", DAY)
-            .parse()
-            .unwrap();
-        let expected = example_schematic();
-
         assert_eq!(
-            parsed.symbols.len(),
-            expected.symbols.len(),
-            "number of symbols matches expected"
+            advent_of_code::template::read_file("examples", DAY).parse(),
+            Ok(example_schematic())
         );
-        for (point, symbol) in expected.symbols {
-            assert_eq!(
-                parsed.symbols.get(&point),
-                Some(&symbol),
-                "check for {symbol} at {point:?}"
-            );
-        }
-
-        assert_eq!(
-            parsed.parts.len(),
-            expected.parts.len(),
-            "number of parts matches expected"
-        );
-        for part in expected.parts {
-            assert!(parsed.parts.contains(&part), "check for {part:?}");
-        }
     }
 
     #[test]
     fn test_adjacent_points_single_digit() {
         let part = Part {
             number: 4,
-            position: Point(1, 1),
+            position: position(1, 1),
         };
-        let adjacent = part.adjacent_points();
-        assert_eq!(adjacent.len(), 8, "8 adjacent points");
-        assert!(adjacent.contains(&Point(0, 0)), "NW");
-        assert!(adjacent.contains(&Point(1, 0)), "N");
-        assert!(adjacent.contains(&Point(2, 0)), "NE");
-        assert!(adjacent.contains(&Point(0, 1)), "W");
-        assert!(adjacent.contains(&Point(2, 1)), "E");
-        assert!(adjacent.contains(&Point(0, 2)), "SW");
-        assert!(adjacent.contains(&Point(1, 2)), "S");
-        assert!(adjacent.contains(&Point(2, 2)), "SE");
+        let mut adjacent = part.adjacent_points();
+        adjacent.sort_unstable();
+
+        assert_eq!(
+            adjacent,
+            vec![
+                position(0, 0),
+                position(1, 0),
+                position(2, 0),
+                position(0, 1),
+                position(2, 1),
+                position(0, 2),
+                position(1, 2),
+                position(2, 2),
+            ]
+        );
     }
 
     #[test]
     fn test_adjacent_points_three_digits() {
         let part = Part {
             number: 437,
-            position: Point(1, 1),
+            position: position(1, 1),
         };
-        let adjacent = part.adjacent_points();
-        assert_eq!(adjacent.len(), 12, "12 adjacent points");
-        assert!(adjacent.contains(&Point(0, 0)), "NW");
-        assert!(adjacent.contains(&Point(1, 0)), "N 1 of 3");
-        assert!(adjacent.contains(&Point(2, 0)), "N 2 of 3");
-        assert!(adjacent.contains(&Point(3, 0)), "N 3 of 3");
-        assert!(adjacent.contains(&Point(4, 0)), "NE");
-        assert!(adjacent.contains(&Point(0, 1)), "W");
-        assert!(adjacent.contains(&Point(4, 1)), "E");
-        assert!(adjacent.contains(&Point(0, 2)), "SW");
-        assert!(adjacent.contains(&Point(1, 2)), "S 1 of 3");
-        assert!(adjacent.contains(&Point(2, 2)), "S 2 of 3");
-        assert!(adjacent.contains(&Point(3, 2)), "S 3 of 3");
-        assert!(adjacent.contains(&Point(4, 2)), "SE");
+        let mut adjacent = part.adjacent_points();
+        adjacent.sort_unstable();
+
+        assert_eq!(
+            adjacent,
+            vec![
+                position(0, 0),
+                position(1, 0),
+                position(2, 0),
+                position(3, 0),
+                position(4, 0),
+                position(0, 1),
+                position(4, 1),
+                position(0, 2),
+                position(1, 2),
+                position(2, 2),
+                position(3, 2),
+                position(4, 2),
+            ]
+        );
     }
 
     #[test]
@@ -309,15 +284,6 @@ mod tests {
     fn test_part_one() {
         let result = part_one(&advent_of_code::template::read_file("examples", DAY));
         assert_eq!(result, Some(4361));
-    }
-
-    #[test]
-    fn test_gears() {
-        let gears = example_schematic().gears();
-        assert_eq!(gears.len(), 3);
-        assert_eq!(gears.get(&Point(4, 2)), Some(&Gear::Valid(16345)));
-        assert_eq!(gears.get(&Point(4, 5)), Some(&Gear::Single(617)));
-        assert_eq!(gears.get(&Point(6, 9)), Some(&Gear::Valid(451490)));
     }
 
     #[test]
