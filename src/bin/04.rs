@@ -80,13 +80,15 @@ pub fn part_one(input: &str) -> Option<u32> {
 pub fn part_two(input: &str) -> Option<u32> {
     if let Ok(scratchcards) = parse_scratchcards(input) {
         let mut copies = vec![1; scratchcards.len()];
+        let mut total = 0;
         for (ix, card) in scratchcards.iter().enumerate() {
+            total += copies[ix];
             let matches = card.matches();
             for card in ix + 1..ix + 1 + matches {
                 copies[card] += copies[ix];
             }
         }
-        Some(copies.iter().sum())
+        Some(total)
     } else {
         None
     }
