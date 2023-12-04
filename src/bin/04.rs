@@ -4,24 +4,23 @@ advent_of_code::solution!(4);
 
 #[derive(Debug, PartialEq)]
 struct Scratchcard {
-    card_no: u32,
     winners: Vec<u32>,
     numbers: Vec<u32>,
 }
 
 impl Scratchcard {
-    fn score(&self) -> u32 {
-        self.numbers.iter().fold(0, |score, number| {
-            if !self.winners.contains(number) {
-                return score;
-            }
+    fn matches(&self) -> usize {
+        self.numbers
+            .iter()
+            .filter(|x| self.winners.contains(x))
+            .count()
+    }
 
-            if score == 0 {
-                1
-            } else {
-                score << 1
-            }
-        })
+    fn score(&self) -> u32 {
+        match self.matches() {
+            0 => 0,
+            x => 1 << (x - 1),
+        }
     }
 }
 
@@ -43,24 +42,11 @@ impl FromStr for Scratchcard {
     type Err = ParseScratchcardError;
 
     fn from_str(line: &str) -> Result<Self, Self::Err> {
-        if let Some((card_desc, all_numbers)) = line.split_once(": ") {
-            let card_no = if let Some(card_no_str) = card_desc.strip_prefix("Card ") {
-                card_no_str
-                    .trim()
-                    .parse()
-                    .map_err(|_| ParseScratchcardError)
-            } else {
-                Err(ParseScratchcardError)
-            }?;
-
+        if let Some((_card_desc, all_numbers)) = line.split_once(": ") {
             if let Some((winners_str, numbers_str)) = all_numbers.split_once(" | ") {
                 let winners = parse_number_list(winners_str)?;
                 let numbers = parse_number_list(numbers_str)?;
-                Ok(Scratchcard {
-                    card_no,
-                    winners,
-                    numbers,
-                })
+                Ok(Scratchcard { winners, numbers })
             } else {
                 Err(ParseScratchcardError)
             }
@@ -70,20 +56,40 @@ impl FromStr for Scratchcard {
     }
 }
 
-#[must_use]
-pub fn part_one(input: &str) -> Option<u32> {
-    Some(input.lines().fold(0, |total, line| {
-        if let Ok(scratchcard) = line.parse::<Scratchcard>() {
-            total + scratchcard.score()
-        } else {
-            total
-        }
-    }))
+fn parse_scratchcards(input: &str) -> Result<Vec<Scratchcard>, ParseScratchcardError> {
+    let mut scratchcards = Vec::new();
+
+    for line in input.lines() {
+        let scratchcard = line.parse()?;
+        scratchcards.push(scratchcard);
+    }
+
+    Ok(scratchcards)
 }
 
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_one(input: &str) -> Option<u32> {
+    if let Ok(scratchcards) = parse_scratchcards(input) {
+        Some(scratchcards.iter().map(Scratchcard::score).sum())
+    } else {
+        None
+    }
+}
+
+#[must_use]
+pub fn part_two(input: &str) -> Option<u32> {
+    if let Ok(scratchcards) = parse_scratchcards(input) {
+        let mut copies = vec![1; scratchcards.len()];
+        for (ix, card) in scratchcards.iter().enumerate() {
+            let matches = card.matches();
+            for card in ix + 1..ix + 1 + matches {
+                copies[card] += copies[ix];
+            }
+        }
+        Some(copies.iter().sum())
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -95,7 +101,6 @@ mod tests {
         assert_eq!(
             "Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53".parse(),
             Ok(Scratchcard {
-                card_no: 1,
                 winners: vec![41, 48, 83, 86, 17],
                 numbers: vec![83, 86, 6, 31, 17, 9, 48, 53],
             })
@@ -103,39 +108,84 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_longer_scratchcard_with_more_whitespace() {
+    fn test_parse_scratchcards() {
         assert_eq!(
-            "Card  96: 73 42 99 21 12 29 77 94  1 26 | 46  5 63 64 83 75 74 86 69 89 79 57 60 48 37 13 96 43 72  4 23 98 59 80 92".parse(),
-            Ok(Scratchcard {
-                card_no: 96,
-                winners: vec![73, 42, 99, 21, 12, 29, 77, 94, 1, 26],
-                numbers: vec![46, 5, 63, 64, 83, 75, 74, 86, 69, 89, 79, 57, 60, 48, 37, 13, 96, 43, 72, 4, 23, 98, 59, 80, 92],
-            })
+            parse_scratchcards(&advent_of_code::template::read_file("examples", DAY)),
+            Ok(vec![
+                Scratchcard {
+                    winners: vec![41, 48, 83, 86, 17],
+                    numbers: vec![83, 86, 6, 31, 17, 9, 48, 53],
+                },
+                Scratchcard {
+                    winners: vec![13, 32, 20, 16, 61],
+                    numbers: vec![61, 30, 68, 82, 17, 32, 24, 19],
+                },
+                Scratchcard {
+                    winners: vec![1, 21, 53, 59, 44],
+                    numbers: vec![69, 82, 63, 72, 16, 21, 14, 1],
+                },
+                Scratchcard {
+                    winners: vec![41, 92, 73, 84, 69],
+                    numbers: vec![59, 84, 76, 51, 58, 5, 54, 83],
+                },
+                Scratchcard {
+                    winners: vec![87, 83, 26, 28, 32],
+                    numbers: vec![88, 30, 70, 12, 93, 22, 82, 36],
+                },
+                Scratchcard {
+                    winners: vec![31, 18, 13, 56, 72],
+                    numbers: vec![74, 77, 10, 23, 35, 67, 36, 11],
+                },
+            ]),
         );
+    }
+
+    #[test]
+    fn test_scratchcard_matches() {
+        let one = Scratchcard {
+            winners: vec![41, 48, 83, 86, 17],
+            numbers: vec![83, 86, 6, 31, 17, 9, 48, 53],
+        };
+        assert_eq!(one.matches(), 4);
+
+        let two = Scratchcard {
+            winners: vec![13, 32, 20, 16, 61],
+            numbers: vec![61, 30, 68, 82, 17, 32, 24, 19],
+        };
+        assert_eq!(two.matches(), 2);
+
+        let four = Scratchcard {
+            winners: vec![41, 92, 73, 84, 69],
+            numbers: vec![59, 84, 76, 51, 58, 5, 54, 83],
+        };
+        assert_eq!(four.matches(), 1);
+
+        let five = Scratchcard {
+            winners: vec![87, 83, 26, 28, 32],
+            numbers: vec![88, 30, 70, 12, 93, 22, 82, 36],
+        };
+        assert_eq!(five.matches(), 0);
     }
 
     #[test]
     fn test_score_scratchcard() {
         let one = Scratchcard {
-            card_no: 1,
             winners: vec![41, 48, 83, 86, 17],
             numbers: vec![83, 86, 6, 31, 17, 9, 48, 53],
         };
         assert_eq!(one.score(), 8);
 
         let three = Scratchcard {
-            card_no: 3,
             winners: vec![1, 21, 53, 59, 44],
             numbers: vec![69, 82, 63, 72, 16, 21, 14, 1],
         };
         assert_eq!(three.score(), 2);
 
-        let five = Scratchcard {
-            card_no: 6,
+        let six = Scratchcard {
             winners: vec![31, 18, 13, 56, 72],
             numbers: vec![74, 77, 10, 23, 35, 67, 36, 11],
         };
-        assert_eq!(five.score(), 0);
+        assert_eq!(six.score(), 0);
     }
 
     #[test]
@@ -147,6 +197,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(30));
     }
 }
