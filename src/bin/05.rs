@@ -22,6 +22,12 @@ impl AlmanacMapEntry {
 #[derive(Debug, PartialEq)]
 struct AlmanacMap(Vec<AlmanacMapEntry>);
 
+#[derive(Debug, PartialEq)]
+struct ValueRange {
+    start: u64,
+    length: u64,
+}
+
 impl AlmanacMap {
     fn convert(&self, source: u64) -> u64 {
         match self
@@ -34,6 +40,46 @@ impl AlmanacMap {
             None => source,
         }
     }
+
+    fn convert_range(&self, range: &ValueRange) -> Vec<ValueRange> {
+        let mut slices = Vec::new();
+        let range_end = range.start + range.length;
+
+        for entry in &self.0 {
+            let source_end = entry.source_start + entry.length;
+
+            if range_end < entry.source_start || range.start > source_end {
+                continue;
+            }
+
+            if entry.source_start > range.start {
+                slices.push(entry.source_start);
+            }
+
+            if source_end < range_end {
+                slices.push(source_end);
+            }
+        }
+
+        slices.sort_unstable_by(|a, b| b.cmp(a));
+
+        let mut output = Vec::new();
+        let mut current = range.start;
+
+        while let Some(position) = slices.pop() {
+            output.push(ValueRange {
+                start: self.convert(current),
+                length: position - current,
+            });
+            current = position;
+        }
+        output.push(ValueRange {
+            start: self.convert(current),
+            length: range_end - current,
+        });
+
+        output
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -43,8 +89,15 @@ struct Almanac {
 }
 
 impl Almanac {
-    fn seed_to_soil_location(&self, seed: u64) -> u64 {
+    fn seed_to_location(&self, seed: u64) -> u64 {
         self.maps.iter().fold(seed, |value, map| map.convert(value))
+    }
+
+    fn seed_ranges(&self) -> impl Iterator<Item = ValueRange> + '_ {
+        (0..self.seeds.len()).step_by(2).map(|ix| ValueRange {
+            start: self.seeds[ix],
+            length: self.seeds[ix + 1],
+        })
     }
 }
 
@@ -136,7 +189,7 @@ pub fn part_one(input: &str) -> Option<u64> {
         almanac
             .seeds
             .iter()
-            .map(|seed| almanac.seed_to_soil_location(*seed))
+            .map(|seed| almanac.seed_to_location(*seed))
             .min()
     } else {
         None
@@ -144,8 +197,23 @@ pub fn part_one(input: &str) -> Option<u64> {
 }
 
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u64> {
-    None
+pub fn part_two(input: &str) -> Option<u64> {
+    if let Ok(almanac) = input.parse::<Almanac>() {
+        let mut current: Vec<ValueRange> = almanac.seed_ranges().collect();
+        let mut future = Vec::new();
+
+        for map in almanac.maps {
+            for range in current {
+                future.extend(map.convert_range(&range));
+            }
+            current = future;
+            future = Vec::new();
+        }
+
+        current.iter().map(|range| range.start).min()
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -293,12 +361,12 @@ mod tests {
     }
 
     #[test]
-    fn test_seed_to_soil_location() {
+    fn test_seed_to_location() {
         let almanac = example_almanac();
-        assert_eq!(almanac.seed_to_soil_location(79), 82);
-        assert_eq!(almanac.seed_to_soil_location(14), 43);
-        assert_eq!(almanac.seed_to_soil_location(55), 86);
-        assert_eq!(almanac.seed_to_soil_location(13), 35);
+        assert_eq!(almanac.seed_to_location(79), 82);
+        assert_eq!(almanac.seed_to_location(14), 43);
+        assert_eq!(almanac.seed_to_location(55), 86);
+        assert_eq!(almanac.seed_to_location(13), 35);
     }
 
     #[test]
@@ -308,8 +376,52 @@ mod tests {
     }
 
     #[test]
+    fn test_seed_to_soil_map_range() {
+        let map = AlmanacMap(vec![
+            AlmanacMapEntry {
+                dest_start: 50,
+                source_start: 98,
+                length: 2,
+            },
+            AlmanacMapEntry {
+                dest_start: 52,
+                source_start: 50,
+                length: 48,
+            },
+        ]);
+        assert_eq!(
+            map.convert_range(&ValueRange {
+                start: 50,
+                length: 5
+            }),
+            vec![ValueRange {
+                start: 52,
+                length: 5
+            }]
+        );
+    }
+
+    #[test]
+    fn test_seed_ranges() {
+        let seed_ranges: Vec<ValueRange> = example_almanac().seed_ranges().collect();
+        assert_eq!(
+            seed_ranges,
+            vec![
+                ValueRange {
+                    start: 79,
+                    length: 14
+                },
+                ValueRange {
+                    start: 55,
+                    length: 13
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(46));
     }
 }
