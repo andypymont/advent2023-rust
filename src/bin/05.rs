@@ -3,12 +3,16 @@ use std::str::FromStr;
 advent_of_code::solution!(5);
 
 #[derive(Debug, PartialEq)]
-struct AlmanacMapEntry(u64, u64, u64);
+struct AlmanacMapEntry {
+    dest_start: u64,
+    source_start: u64,
+    length: u64,
+}
 
 impl AlmanacMapEntry {
     fn convert(&self, source: u64) -> Option<u64> {
-        if self.1 <= source && source < (self.1 + self.2) {
-            Some(source - self.1 + self.0)
+        if self.source_start <= source && source < (self.source_start + self.length) {
+            Some(source - self.source_start + self.dest_start)
         } else {
             None
         }
@@ -118,7 +122,11 @@ impl FromStr for AlmanacMapEntry {
         let source_start = source_start?;
         let length = length?;
 
-        Ok(AlmanacMapEntry(dest_start, source_start, length))
+        Ok(AlmanacMapEntry {
+            dest_start,
+            source_start,
+            length,
+        })
     }
 }
 
@@ -149,33 +157,108 @@ mod tests {
             seeds: vec![79, 14, 55, 13],
             maps: vec![
                 AlmanacMap(vec![
-                    AlmanacMapEntry(50, 98, 2),
-                    AlmanacMapEntry(52, 50, 48),
+                    AlmanacMapEntry {
+                        dest_start: 50,
+                        source_start: 98,
+                        length: 2,
+                    },
+                    AlmanacMapEntry {
+                        dest_start: 52,
+                        source_start: 50,
+                        length: 48,
+                    },
                 ]),
                 AlmanacMap(vec![
-                    AlmanacMapEntry(0, 15, 37),
-                    AlmanacMapEntry(37, 52, 2),
-                    AlmanacMapEntry(39, 0, 15),
+                    AlmanacMapEntry {
+                        dest_start: 0,
+                        source_start: 15,
+                        length: 37,
+                    },
+                    AlmanacMapEntry {
+                        dest_start: 37,
+                        source_start: 52,
+                        length: 2,
+                    },
+                    AlmanacMapEntry {
+                        dest_start: 39,
+                        source_start: 0,
+                        length: 15,
+                    },
                 ]),
                 AlmanacMap(vec![
-                    AlmanacMapEntry(49, 53, 8),
-                    AlmanacMapEntry(0, 11, 42),
-                    AlmanacMapEntry(42, 0, 7),
-                    AlmanacMapEntry(57, 7, 4),
+                    AlmanacMapEntry {
+                        dest_start: 49,
+                        source_start: 53,
+                        length: 8,
+                    },
+                    AlmanacMapEntry {
+                        dest_start: 0,
+                        source_start: 11,
+                        length: 42,
+                    },
+                    AlmanacMapEntry {
+                        dest_start: 42,
+                        source_start: 0,
+                        length: 7,
+                    },
+                    AlmanacMapEntry {
+                        dest_start: 57,
+                        source_start: 7,
+                        length: 4,
+                    },
                 ]),
                 AlmanacMap(vec![
-                    AlmanacMapEntry(88, 18, 7),
-                    AlmanacMapEntry(18, 25, 70),
+                    AlmanacMapEntry {
+                        dest_start: 88,
+                        source_start: 18,
+                        length: 7,
+                    },
+                    AlmanacMapEntry {
+                        dest_start: 18,
+                        source_start: 25,
+                        length: 70,
+                    },
                 ]),
                 AlmanacMap(vec![
-                    AlmanacMapEntry(45, 77, 23),
-                    AlmanacMapEntry(81, 45, 19),
-                    AlmanacMapEntry(68, 64, 13),
+                    AlmanacMapEntry {
+                        dest_start: 45,
+                        source_start: 77,
+                        length: 23,
+                    },
+                    AlmanacMapEntry {
+                        dest_start: 81,
+                        source_start: 45,
+                        length: 19,
+                    },
+                    AlmanacMapEntry {
+                        dest_start: 68,
+                        source_start: 64,
+                        length: 13,
+                    },
                 ]),
-                AlmanacMap(vec![AlmanacMapEntry(0, 69, 1), AlmanacMapEntry(1, 0, 69)]),
                 AlmanacMap(vec![
-                    AlmanacMapEntry(60, 56, 37),
-                    AlmanacMapEntry(56, 93, 4),
+                    AlmanacMapEntry {
+                        dest_start: 0,
+                        source_start: 69,
+                        length: 1,
+                    },
+                    AlmanacMapEntry {
+                        dest_start: 1,
+                        source_start: 0,
+                        length: 69,
+                    },
+                ]),
+                AlmanacMap(vec![
+                    AlmanacMapEntry {
+                        dest_start: 60,
+                        source_start: 56,
+                        length: 37,
+                    },
+                    AlmanacMapEntry {
+                        dest_start: 56,
+                        source_start: 93,
+                        length: 4,
+                    },
                 ]),
             ],
         }
@@ -192,8 +275,16 @@ mod tests {
     #[test]
     fn test_seed_to_soil_map() {
         let map = AlmanacMap(vec![
-            AlmanacMapEntry(50, 98, 2),
-            AlmanacMapEntry(52, 50, 48),
+            AlmanacMapEntry {
+                dest_start: 50,
+                source_start: 98,
+                length: 2,
+            },
+            AlmanacMapEntry {
+                dest_start: 52,
+                source_start: 50,
+                length: 48,
+            },
         ]);
         assert_eq!(map.convert(79), 81);
         assert_eq!(map.convert(14), 14);
