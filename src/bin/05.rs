@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::str::FromStr;
 
 advent_of_code::solution!(5);
@@ -42,7 +43,7 @@ impl AlmanacMap {
     }
 
     fn convert_range(&self, range: &ValueRange) -> Vec<ValueRange> {
-        let mut slices = Vec::new();
+        let mut slices = BTreeSet::new();
         let range_end = range.start + range.length;
 
         for entry in &self.0 {
@@ -53,30 +54,25 @@ impl AlmanacMap {
             }
 
             if entry.source_start > range.start {
-                slices.push(entry.source_start);
+                slices.insert(entry.source_start);
             }
 
             if source_end < range_end {
-                slices.push(source_end);
+                slices.insert(source_end);
             }
         }
-
-        slices.sort_unstable_by(|a, b| b.cmp(a));
+        slices.insert(range_end);
 
         let mut output = Vec::new();
         let mut current = range.start;
 
-        while let Some(position) = slices.pop() {
+        for position in slices {
             output.push(ValueRange {
                 start: self.convert(current),
                 length: position - current,
             });
             current = position;
         }
-        output.push(ValueRange {
-            start: self.convert(current),
-            length: range_end - current,
-        });
 
         output
     }
