@@ -2,23 +2,32 @@ advent_of_code::solution!(6);
 
 #[derive(Debug, PartialEq)]
 struct Race {
-    time: u32,
-    distance: u32,
+    time: u64,
+    distance: u64,
 }
 
 impl Race {
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    fn times_that_beat_record(&self) -> u32 {
-        let distance = self.distance + 1; // need to beat record, not just match it
-        let bsquared_minus_4ac: f64 = (self.time.pow(2) - (4 * distance)).into();
-        let root = bsquared_minus_4ac.sqrt();
+    fn times_that_beat_record(&self) -> u64 {
+        let mut lower: Option<u64> = None;
+        let mut upper: Option<u64> = None;
 
-        let time: f64 = self.time.into();
+        for hold in 1..=self.time {
+            let distance = (self.time - hold) * hold;
+            if lower.is_none() {
+                if distance > self.distance {
+                    lower = Some(hold);
+                }
+            } else if distance <= self.distance {
+                upper = Some(hold);
+                break;
+            }
+        }
 
-        let lower = ((time - root) / 2.0).ceil() as u32;
-        let upper = ((time + root) / 2.0).floor() as u32;
-
-        upper - lower + 1
+        if lower.is_none() || upper.is_none() {
+            0
+        } else {
+            upper.unwrap_or(0) - lower.unwrap_or(0)
+        }
     }
 }
 
@@ -32,12 +41,12 @@ fn read_races(input: &str) -> Result<Vec<Race>, ParseRacesError> {
     for line in input.lines() {
         if let Some(times_str) = line.strip_prefix("Time: ") {
             for time in times_str.split_whitespace() {
-                let time = time.parse::<u32>().map_err(|_| ParseRacesError)?;
+                let time = time.parse::<u64>().map_err(|_| ParseRacesError)?;
                 times.push(time);
             }
         } else if let Some(distances_str) = line.strip_prefix("Distance: ") {
             for distance in distances_str.split_whitespace() {
-                let distance = distance.parse::<u32>().map_err(|_| ParseRacesError)?;
+                let distance = distance.parse::<u64>().map_err(|_| ParseRacesError)?;
                 distances.push(distance);
             }
         } else {
@@ -59,8 +68,29 @@ fn read_races(input: &str) -> Result<Vec<Race>, ParseRacesError> {
         .collect())
 }
 
+fn read_single_race(input: &str) -> Result<Race, ParseRacesError> {
+    let mut time: Result<u64, ParseRacesError> = Err(ParseRacesError);
+    let mut distance: Result<u64, ParseRacesError> = Err(ParseRacesError);
+
+    for line in input.lines() {
+        if let Some(time_str) = line.strip_prefix("Time: ") {
+            let time_str = time_str.replace(' ', "");
+            time = time_str.parse().map_err(|_| ParseRacesError);
+        } else if let Some(distance_str) = line.strip_prefix("Distance: ") {
+            let distance_str = distance_str.replace(' ', "");
+            distance = distance_str.parse().map_err(|_| ParseRacesError);
+        } else {
+            return Err(ParseRacesError);
+        }
+    }
+
+    let time = time?;
+    let distance = distance?;
+    Ok(Race { time, distance })
+}
+
 #[must_use]
-pub fn part_one(input: &str) -> Option<u32> {
+pub fn part_one(input: &str) -> Option<u64> {
     if let Ok(races) = read_races(input) {
         Some(races.iter().map(Race::times_that_beat_record).product())
     } else {
@@ -69,8 +99,12 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u64> {
+    if let Ok(race) = read_single_race(input) {
+        Some(race.times_that_beat_record())
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -126,8 +160,19 @@ mod tests {
     }
 
     #[test]
+    fn test_read_single_race() {
+        assert_eq!(
+            read_single_race(&advent_of_code::template::read_file("examples", DAY)),
+            Ok(Race {
+                time: 71530,
+                distance: 940200,
+            })
+        );
+    }
+
+    #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(71503));
     }
 }
