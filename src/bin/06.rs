@@ -8,26 +8,20 @@ struct Race {
 
 impl Race {
     fn times_that_beat_record(&self) -> u64 {
-        let mut lower: Option<u64> = None;
-        let mut upper: Option<u64> = None;
+        let mut left = 0;
+        let mut right = self.time / 2;
 
-        for hold in 1..=self.time {
+        while left < right {
+            let hold = (left + right) / 2;
             let distance = (self.time - hold) * hold;
-            if lower.is_none() {
-                if distance > self.distance {
-                    lower = Some(hold);
-                }
-            } else if distance <= self.distance {
-                upper = Some(hold);
-                break;
+            if distance <= self.distance {
+                left = hold + 1;
+            } else {
+                right = hold;
             }
         }
 
-        if lower.is_none() || upper.is_none() {
-            0
-        } else {
-            upper.unwrap_or(0) - lower.unwrap_or(0)
-        }
+        self.time - (2 * left) + 1
     }
 }
 
