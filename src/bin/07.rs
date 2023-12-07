@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::str::FromStr;
 
 advent_of_code::solution!(7);
@@ -15,29 +14,27 @@ enum HandType {
 }
 
 impl HandType {
-    fn from_cards(cards: [u8; 5]) -> Self {
-        let mut values = BTreeMap::new();
-        let mut jokers = 0;
-        for value in cards {
-            if value == 0 {
-                jokers += 1;
-            } else {
-                values.entry(value).and_modify(|x| *x += 1).or_insert(1);
-            }
+    fn from_cards(cards: [usize; 5]) -> Self {
+        let mut counts: [usize; 15] = [0; 15];
+        for card in cards {
+            counts[card] += 1;
         }
+        let (values, max) = counts[1..].iter().fold((0, 0), |(values, max), value| {
+            (values + usize::from(value > &0), max.max(*value))
+        });
 
-        match values.values().max().unwrap_or(&0) + jokers {
+        match max + counts[0] {
             5 => HandType::FiveOfAKind,
             4 => HandType::FourOfAKind,
             3 => {
-                if values.len() == 2 {
+                if values == 2 {
                     HandType::FullHouse
                 } else {
                     HandType::ThreeOfAKind
                 }
             }
             2 => {
-                if values.len() == 3 {
+                if values == 3 {
                     HandType::TwoPair
                 } else {
                     HandType::OnePair
@@ -51,7 +48,7 @@ impl HandType {
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct Hand {
     hand_type: HandType,
-    cards: [u8; 5],
+    cards: [usize; 5],
     bid: u32,
 }
 
