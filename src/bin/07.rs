@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::str::FromStr;
 
 advent_of_code::solution!(7);
@@ -15,23 +16,33 @@ enum HandType {
 
 impl HandType {
     fn from_cards(cards: [u8; 5]) -> Self {
-        let mut matches: [u8; 5] = [0; 5];
-        for a in 0..5 {
-            for b in 0..5 {
-                if cards[a] == cards[b] {
-                    matches[b] += 1;
-                }
+        let mut values = BTreeMap::new();
+        let mut jokers = 0;
+        for value in cards {
+            if value == 0 {
+                jokers += 1;
+            } else {
+                values.entry(value).and_modify(|x| *x += 1).or_insert(1);
             }
         }
 
-        matches.sort_unstable();
-        match matches {
-            [5, 5, 5, 5, 5] => HandType::FiveOfAKind,
-            [1, 4, 4, 4, 4] => HandType::FourOfAKind,
-            [2, 2, 3, 3, 3] => HandType::FullHouse,
-            [_, _, 3, 3, 3] => HandType::ThreeOfAKind,
-            [1, 2, 2, 2, 2] => HandType::TwoPair,
-            [_, _, _, _, 2] => HandType::OnePair,
+        match values.values().max().unwrap_or(&0) + jokers {
+            5 => HandType::FiveOfAKind,
+            4 => HandType::FourOfAKind,
+            3 => {
+                if values.len() == 2 {
+                    HandType::FullHouse
+                } else {
+                    HandType::ThreeOfAKind
+                }
+            }
+            2 => {
+                if values.len() == 3 {
+                    HandType::TwoPair
+                } else {
+                    HandType::OnePair
+                }
+            }
             _ => HandType::HighCard,
         }
     }
@@ -63,6 +74,7 @@ impl FromStr for Hand {
                 }
 
                 let card = match card {
+                    'j' => Ok(0),
                     '2' => Ok(2),
                     '3' => Ok(3),
                     '4' => Ok(4),
@@ -104,6 +116,10 @@ fn read_hands(input: &str) -> Result<Vec<Hand>, ParseHandError> {
     Ok(hands)
 }
 
+fn read_joker_hands(input: &str) -> Result<Vec<Hand>, ParseHandError> {
+    read_hands(&input.replace('J', "j"))
+}
+
 #[must_use]
 pub fn part_one(input: &str) -> Option<u32> {
     if let Ok(mut hands) = read_hands(input) {
@@ -121,8 +137,19 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u32> {
+    if let Ok(mut hands) = read_joker_hands(input) {
+        hands.sort_unstable();
+        Some(
+            hands
+                .iter()
+                .enumerate()
+                .map(|(ix, hand)| u32::try_from(ix + 1).unwrap_or(0) * hand.bid)
+                .sum(),
+        )
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -160,7 +187,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_hand() {
+    fn test_parse_hand() {
         assert_eq!(
             "32T3K 765".parse(),
             Ok(Hand {
@@ -238,8 +265,78 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_joker_hand() {
+        assert_eq!(
+            "T55j5 684".parse(),
+            Ok(Hand {
+                cards: [10, 5, 5, 0, 5],
+                hand_type: HandType::FourOfAKind,
+                bid: 684,
+            }),
+        );
+        assert_eq!(
+            "KTjjT 220".parse(),
+            Ok(Hand {
+                cards: [13, 10, 0, 0, 10],
+                hand_type: HandType::FourOfAKind,
+                bid: 220,
+            }),
+        );
+        assert_eq!(
+            "234jj 137".parse(),
+            Ok(Hand {
+                cards: [2, 3, 4, 0, 0],
+                hand_type: HandType::ThreeOfAKind,
+                bid: 137,
+            }),
+        );
+        assert_eq!(
+            "2345j 9652".parse(),
+            Ok(Hand {
+                cards: [2, 3, 4, 5, 0],
+                hand_type: HandType::OnePair,
+                bid: 9652,
+            }),
+        )
+    }
+
+    #[test]
+    fn test_read_joker_hands() {
+        assert_eq!(
+            read_joker_hands(&advent_of_code::template::read_file("examples", DAY)),
+            Ok(vec![
+                Hand {
+                    cards: [3, 2, 10, 3, 13],
+                    hand_type: HandType::OnePair,
+                    bid: 765,
+                },
+                Hand {
+                    cards: [10, 5, 5, 0, 5],
+                    hand_type: HandType::FourOfAKind,
+                    bid: 684,
+                },
+                Hand {
+                    cards: [13, 13, 6, 7, 7],
+                    hand_type: HandType::TwoPair,
+                    bid: 28,
+                },
+                Hand {
+                    cards: [13, 10, 0, 0, 10],
+                    hand_type: HandType::FourOfAKind,
+                    bid: 220,
+                },
+                Hand {
+                    cards: [12, 12, 12, 0, 14],
+                    hand_type: HandType::FourOfAKind,
+                    bid: 483,
+                },
+            ]),
+        );
+    }
+
+    #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(5905));
     }
 }
