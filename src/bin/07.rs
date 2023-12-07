@@ -49,7 +49,7 @@ impl HandType {
 struct Hand {
     hand_type: HandType,
     cards: [usize; 5],
-    bid: u32,
+    bid: usize,
 }
 
 #[derive(Debug, PartialEq)]
@@ -118,14 +118,14 @@ fn read_joker_hands(input: &str) -> Result<Vec<Hand>, ParseHandError> {
 }
 
 #[must_use]
-pub fn part_one(input: &str) -> Option<u32> {
+pub fn part_one(input: &str) -> Option<usize> {
     if let Ok(mut hands) = read_hands(input) {
         hands.sort_unstable();
         Some(
             hands
                 .iter()
                 .enumerate()
-                .map(|(ix, hand)| u32::try_from(ix + 1).unwrap_or(0) * hand.bid)
+                .map(|(ix, hand)| (ix + 1) * hand.bid)
                 .sum(),
         )
     } else {
@@ -134,14 +134,14 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 #[must_use]
-pub fn part_two(input: &str) -> Option<u32> {
+pub fn part_two(input: &str) -> Option<usize> {
     if let Ok(mut hands) = read_joker_hands(input) {
         hands.sort_unstable();
         Some(
             hands
                 .iter()
                 .enumerate()
-                .map(|(ix, hand)| u32::try_from(ix + 1).unwrap_or(0) * hand.bid)
+                .map(|(ix, hand)| (ix + 1) * hand.bid)
                 .sum(),
         )
     } else {
