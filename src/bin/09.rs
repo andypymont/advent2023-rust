@@ -26,6 +26,15 @@ impl Sequence {
             last + self.differences().next_item()
         }
     }
+
+    fn prev_item(&self) -> i32 {
+        let first = self.0.first().unwrap_or(&0);
+        if self.0.iter().all(|item| item == first) {
+            *first
+        } else {
+            first - self.differences().prev_item()
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -59,8 +68,17 @@ pub fn part_one(input: &str) -> Option<i32> {
 }
 
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<i32> {
+    Some(
+        input
+            .lines()
+            .map(|line| {
+                Sequence::from_str(line)
+                    .unwrap_or_else(|_| Sequence::empty())
+                    .prev_item()
+            })
+            .sum(),
+    )
 }
 
 #[cfg(test)]
@@ -111,8 +129,17 @@ mod tests {
     }
 
     #[test]
+    fn test_prev_item() {
+        let sequence = Sequence(vec![0, 3, 6, 9, 12, 15]);
+        assert_eq!(sequence.prev_item(), -3);
+
+        let sequence = Sequence(vec![10, 13, 16, 21, 30, 45]);
+        assert_eq!(sequence.prev_item(), 5);
+    }
+
+    #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(2));
     }
 }
