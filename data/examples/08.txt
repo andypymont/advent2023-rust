@@ -1,9 +1,12 @@
-RL
+LR
 
-AAA = (BBB, CCC)
-BBB = (DDD, EEE)
-CCC = (ZZZ, GGG)
-DDD = (DDD, DDD)
-EEE = (EEE, EEE)
-GGG = (GGG, GGG)
-ZZZ = (ZZZ, ZZZ)
+AAA = (BBB, OOB)
+OOB = (OOB, OOB)
+BBB = (OOB, CCC)
+CCC = (ZZZ, OOB)
+ZZZ = (OOB, CCC)
+GOA = (DDD, OOB)
+DDD = (FFF, EEE)
+EEE = (FEZ, OOB)
+FFF = (OOB, FEZ)
+FEZ = (DDD, DDD)
