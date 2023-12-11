@@ -12,7 +12,7 @@ struct StarMap {
 }
 
 impl StarMap {
-    fn galactic_distance(&self, first: usize, second: usize) -> usize {
+    fn galactic_distance(&self, first: usize, second: usize, expand_empty: usize) -> usize {
         let x: usize = {
             let (first, second) = {
                 let first = first % GRID_SIZE;
@@ -24,7 +24,7 @@ impl StarMap {
                 }
             };
             ((first + 1)..=second)
-                .map(|x| if self.empty_cols[x] { 2 } else { 1 })
+                .map(|x| if self.empty_cols[x] { expand_empty } else { 1 })
                 .sum()
         };
         let y: usize = {
@@ -38,20 +38,20 @@ impl StarMap {
                 }
             };
             ((first + 1)..=second)
-                .map(|y| if self.empty_rows[y] { 2 } else { 1 })
+                .map(|y| if self.empty_rows[y] { expand_empty } else { 1 })
                 .sum()
         };
         x + y
     }
 
-    fn total_galactic_distance(&self) -> usize {
+    fn total_galactic_distance(&self, expand_empty: usize) -> usize {
         self.stars
             .iter()
             .enumerate()
             .flat_map(|(ix, first)| {
                 self.stars[ix + 1..]
                     .iter()
-                    .map(|second| self.galactic_distance(*first, *second))
+                    .map(|second| self.galactic_distance(*first, *second, expand_empty))
             })
             .sum()
     }
@@ -89,15 +89,19 @@ impl FromStr for StarMap {
 #[must_use]
 pub fn part_one(input: &str) -> Option<usize> {
     if let Ok(starmap) = StarMap::from_str(input) {
-        Some(starmap.total_galactic_distance())
+        Some(starmap.total_galactic_distance(2))
     } else {
         None
     }
 }
 
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<usize> {
+    if let Ok(starmap) = StarMap::from_str(input) {
+        Some(starmap.total_galactic_distance(1_000_000))
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -161,9 +165,9 @@ mod tests {
             let first = starmap.stars[first_ix];
             let second = starmap.stars[second_ix];
             assert_eq!(
-                starmap.galactic_distance(first, second),
+                starmap.galactic_distance(first, second, 2),
                 expected,
-                "galactic_distance between star {first_ix} and star {second_ix} is {expected}"
+                "galactic_distance between star {first_ix} and star {second_ix} with expansion 2 is {expected}"
             );
         }
     }
@@ -177,6 +181,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(82_000_210));
     }
 }
