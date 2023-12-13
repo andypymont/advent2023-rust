@@ -2,20 +2,16 @@ use std::str::FromStr;
 
 advent_of_code::solution!(13);
 
-fn sequence_mirrors_after(sequence: &[usize]) -> Option<usize> {
-    for ix in 1..sequence.len() {
-        let mut left: Vec<&usize> = sequence[..ix].iter().collect();
+fn sequence_mirrors_after(sequence: &[usize]) -> impl Iterator<Item = usize> + '_ {
+    (1..sequence.len()).filter(|ix| {
+        let mut left: Vec<&usize> = sequence[..*ix].iter().collect();
         left.reverse();
-        let right = &sequence[ix..];
+        let right = &sequence[*ix..];
 
         let size = left.len().min(right.len());
 
-        if (0..size).all(|pos| *left[pos] == right[pos]) {
-            return Some(ix);
-        }
-    }
-
-    None
+        (0..size).all(|pos| *left[pos] == right[pos])
+    })
 }
 
 #[derive(Debug, PartialEq)]
@@ -40,12 +36,32 @@ struct Pattern {
 }
 
 impl Pattern {
-    fn find_mirror(&self) -> Option<Mirror> {
-        if let Some(cols) = sequence_mirrors_after(&self.cols) {
-            Some(Mirror::Vertical(cols))
+    fn find_mirrors(&self) -> impl Iterator<Item = Mirror> + '_ {
+        let vert = sequence_mirrors_after(&self.cols).map(Mirror::Vertical);
+        let horz = sequence_mirrors_after(&self.rows).map(Mirror::Horizontal);
+        vert.chain(horz)
+    }
+
+    fn smudge(&self, r: usize, c: usize) -> Self {
+        let mut cols = self.cols.clone();
+        let mut rows = self.rows.clone();
+
+        let flag_r = 1 << c;
+        let flag_c = 1 << r;
+
+        if rows[r] & flag_r == 0 {
+            rows[r] |= flag_r;
+            cols[c] |= flag_c;
         } else {
-            sequence_mirrors_after(&self.rows).map(Mirror::Horizontal)
+            rows[r] &= !flag_r;
+            cols[c] &= !flag_c;
         }
+
+        Self { cols, rows }
+    }
+
+    fn smudged_variants(&self) -> impl Iterator<Item = Self> + '_ {
+        (0..self.rows.len()).flat_map(move |r| (0..self.cols.len()).map(move |c| self.smudge(r, c)))
     }
 }
 
@@ -90,7 +106,7 @@ pub fn part_one(input: &str) -> Option<usize> {
         let Ok(pattern) = Pattern::from_str(line) else {
             return (errors + 1, total)
         };
-        let Some(mirror) = pattern.find_mirror() else {
+        let Some(mirror) = pattern.find_mirrors().next() else {
             return (errors + 1, total)
         };
         (errors, total + mirror.value())
@@ -103,8 +119,27 @@ pub fn part_one(input: &str) -> Option<usize> {
 }
 
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<usize> {
+    let (errors, total) = input.split("\n\n").fold((0, 0), |(errors, total), line| {
+        let Ok(pattern) = Pattern::from_str(line) else {
+            return (errors + 1, total)
+        };
+        let Some(unsmudged) = pattern.find_mirrors().next() else {
+            return (errors + 1, total)
+        };
+        for smudged in pattern.smudged_variants() {
+            if let Some(mirror) = smudged.find_mirrors().find(|v| v != &unsmudged) {
+                return (errors, total + mirror.value());
+            }
+        }
+
+        (errors + 1, total)
+    });
+    if errors > 0 {
+        None
+    } else {
+        Some(total)
+    }
 }
 
 #[cfg(test)]
@@ -147,19 +182,33 @@ mod tests {
 
     #[test]
     fn test_sequence_mirrors_after() {
-        assert_eq!(sequence_mirrors_after(&[13, 5, 5, 13]), Some(2),);
-        assert_eq!(sequence_mirrors_after(&[7, 1, 7, 7, 1, 7]), Some(3),);
-        assert_eq!(sequence_mirrors_after(&[13, 14, 15, 16]), None,);
-        assert_eq!(sequence_mirrors_after(&[13, 5, 5, 14]), None,);
+        assert_eq!(
+            sequence_mirrors_after(&[13, 5, 5, 13]).collect::<Vec<usize>>(),
+            vec![2]
+        );
+        assert_eq!(
+            sequence_mirrors_after(&[7, 1, 7, 7, 1, 7]).collect::<Vec<usize>>(),
+            vec![3]
+        );
+        assert_eq!(
+            sequence_mirrors_after(&[13, 14, 15, 16]).collect::<Vec<usize>>(),
+            Vec::new()
+        );
+        assert_eq!(
+            sequence_mirrors_after(&[13, 5, 5, 14]).collect::<Vec<usize>>(),
+            Vec::new()
+        );
     }
 
     #[test]
-    fn test_pattern_find_mirror() {
+    fn test_pattern_find_mirrors() {
         let pattern = first_example_pattern();
-        assert_eq!(pattern.find_mirror(), Some(Mirror::Vertical(5)),);
+        let mirrors: Vec<Mirror> = pattern.find_mirrors().collect();
+        assert_eq!(mirrors, vec![Mirror::Vertical(5)]);
 
         let pattern = second_example_pattern();
-        assert_eq!(pattern.find_mirror(), Some(Mirror::Horizontal(4)),);
+        let mirrors: Vec<Mirror> = pattern.find_mirrors().collect();
+        assert_eq!(mirrors, vec![Mirror::Horizontal(4)]);
     }
 
     #[test]
@@ -169,8 +218,16 @@ mod tests {
     }
 
     #[test]
+    fn test_smudged_variants() {
+        let pattern = first_example_pattern();
+        let variants: Vec<Pattern> = pattern.smudged_variants().collect();
+        assert_eq!(variants.len(), 63);
+        assert!(variants.iter().all(|v| v != &pattern));
+    }
+
+    #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(400));
     }
 }
