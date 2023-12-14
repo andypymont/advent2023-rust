@@ -1,146 +1,153 @@
-use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::str::FromStr;
 
 advent_of_code::solution!(12);
 
-struct ArrangementCalculator {
-    cache: HashMap<String, u64>,
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum Spring {
+    Operational,
+    Damaged,
+    Unknown,
 }
 
-impl ArrangementCalculator {
-    fn new() -> Self {
-        Self {
-            cache: HashMap::new(),
-        }
-    }
+#[derive(Debug, PartialEq)]
+struct ConditionRecord {
+    springs: Vec<Spring>,
+    groups: Vec<usize>,
+}
 
-    fn possible_arrangements_for_line(&mut self, line: &str) -> u64 {
-        if let Some((springs, groups)) = line.split_once(' ') {
-            self.possible_arrangements(springs, groups)
-        } else {
-            0
-        }
-    }
-
-    fn possible_arrangements_for_unfolded_line(&mut self, line: &str) -> u64 {
-        if let Some((springs, groups)) = line.split_once(' ') {
-            let mut repeated_springs = String::new();
-            let mut repeated_groups = String::new();
-
-            for ix in 1..=5 {
-                repeated_springs.push_str(springs);
-                repeated_groups.push_str(groups);
-                if ix < 5 {
-                    repeated_springs.push('?');
-                    repeated_groups.push(',');
-                }
-            }
-
-            self.possible_arrangements(&repeated_springs, &repeated_groups)
-        } else {
-            0
-        }
-    }
-
-    fn possible_arrangements(&mut self, springs: &str, groups: &str) -> u64 {
-        self.possible_arrangements_for_section(springs, groups, 0)
+impl ConditionRecord {
+    fn possible_arrangements(&self) -> u64 {
+        let mut cache = HashMap::new();
+        self.possible_arrangements_for_section(&mut cache, 0, 0)
     }
 
     fn possible_arrangements_for_section(
-        &mut self,
-        springs: &str,
-        groups: &str,
-        collected: u64,
+        &self,
+        cache: &mut HashMap<(usize, usize), u64>,
+        spring_ix: usize,
+        group_ix: usize,
     ) -> u64 {
-        let key = format!("{springs}--{groups}--{collected}");
-        if let Some(value) = self.cache.get(&key) {
-            *value
-        } else {
-            let value =
-                self.calculate_possible_arrangements_for_section(springs, groups, collected);
-            self.cache.insert(key, value);
-            value
+        if let Some(cached_value) = cache.get(&(spring_ix, group_ix)) {
+            return *cached_value;
         }
-    }
 
-    fn calculate_possible_arrangements_for_section(
-        &mut self,
-        springs: &str,
-        groups: &str,
-        collected: u64,
-    ) -> u64 {
-        let spring = springs.chars().next();
+        // check if the current group can be satisfied from this position:
+        let consume_group = self.groups.get(group_ix).map_or(0, |group_len| {
+            // group is long enough to fit within remaining springs
+            if (spring_ix + group_len) > self.springs.len() {
+                return 0;
+            }
 
-        let (group_txt, later_groups) = if let Some((group_txt, others)) = groups.split_once(',') {
-            (group_txt, others)
-        } else if !groups.is_empty() {
-            (groups, "")
-        } else {
-            ("", "")
+            // group does not contain Operational springs
+            if (0..*group_len)
+                .any(|pos| self.springs.get(spring_ix + pos) == Some(&Spring::Operational))
+            {
+                return 0;
+            }
+
+            // item after group is not a Damaged spring
+            if self.springs.get(spring_ix + group_len) == Some(&Spring::Damaged) {
+                return 0;
+            }
+
+            // if none of the above checks failed, we have a group which we can consume
+            self.possible_arrangements_for_section(cache, spring_ix + group_len + 1, group_ix + 1)
+        });
+
+        // also check if we can skip this position
+        let skip = match self.springs.get(spring_ix) {
+            None => u64::from(group_ix >= self.groups.len()),
+            Some(Spring::Damaged) => 0,
+            Some(_) => self.possible_arrangements_for_section(cache, spring_ix + 1, group_ix),
         };
-        let group = group_txt.parse();
 
-        match (spring, group) {
-            (None, Err(_)) => 1,
-            (Some(_), Err(_)) => u64::from(!springs.contains('#')),
-            (None, Ok(_)) => 0,
-            (Some(first), Ok(group)) => match first {
-                '#' => match (collected + 1).cmp(&group) {
-                    Ordering::Greater => 0,
-                    Ordering::Equal => match springs.chars().nth(1) {
-                        Some('#') => 0,
-                        Some(_) => {
-                            self.possible_arrangements_for_section(&springs[2..], later_groups, 0)
-                        }
-                        None => u64::from(later_groups.is_empty()),
-                    },
-                    Ordering::Less => {
-                        self.possible_arrangements_for_section(&springs[1..], groups, collected + 1)
-                    }
-                },
-                '.' => {
-                    if collected > 0 {
-                        0
-                    } else {
-                        self.possible_arrangements_for_section(&springs[1..], groups, 0)
-                    }
-                }
-                _ => {
-                    self.possible_arrangements_for_section(
-                        &springs.replacen('?', ".", 1),
-                        groups,
-                        collected,
-                    ) + self.possible_arrangements_for_section(
-                        &springs.replacen('?', "#", 1),
-                        groups,
-                        collected,
-                    )
-                }
-            },
+        // add the consume_group and skip possibilities together, record in cache, and return
+        let arrangements = consume_group + skip;
+        cache.insert((spring_ix, group_ix), arrangements);
+        arrangements
+    }
+
+    fn unfold(&self) -> Self {
+        let mut springs = Vec::new();
+        let mut groups = Vec::new();
+
+        for repeat in 1..=5 {
+            springs.extend(&self.springs);
+            if repeat != 5 {
+                springs.push(Spring::Unknown);
+            }
+            groups.extend(&self.groups);
+        }
+
+        Self { springs, groups }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct ParseConditionRecordError;
+
+impl TryFrom<char> for Spring {
+    type Error = ParseConditionRecordError;
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            '.' => Ok(Self::Operational),
+            '#' => Ok(Self::Damaged),
+            '?' => Ok(Self::Unknown),
+            _ => Err(ParseConditionRecordError),
         }
     }
+}
+
+impl FromStr for ConditionRecord {
+    type Err = ParseConditionRecordError;
+
+    fn from_str(line: &str) -> Result<Self, Self::Err> {
+        if let Some((springs_txt, groups_txt)) = line.split_once(' ') {
+            let mut springs = Vec::new();
+            for spring in springs_txt.chars() {
+                let spring = spring.try_into()?;
+                springs.push(spring);
+            }
+
+            let mut groups = Vec::new();
+            for group in groups_txt.split(',') {
+                let group = group.parse().map_err(|_| ParseConditionRecordError)?;
+                groups.push(group);
+            }
+
+            Ok(ConditionRecord { springs, groups })
+        } else {
+            Err(ParseConditionRecordError)
+        }
+    }
+}
+
+fn total_possible_arrangements(input: &str, unfold: bool) -> u64 {
+    input
+        .lines()
+        .map(|line| match line.parse::<ConditionRecord>() {
+            Ok(record) => {
+                if unfold {
+                    record.unfold().possible_arrangements()
+                } else {
+                    record.possible_arrangements()
+                }
+            }
+            Err(_) => 0,
+        })
+        .sum()
 }
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<u64> {
-    let mut calc = ArrangementCalculator::new();
-    Some(
-        input
-            .lines()
-            .map(|line| calc.possible_arrangements_for_line(line))
-            .sum(),
-    )
+    Some(total_possible_arrangements(input, false))
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<u64> {
-    let mut calc = ArrangementCalculator::new();
-    Some(
-        input
-            .lines()
-            .map(|line| calc.possible_arrangements_for_unfolded_line(line))
-            .sum(),
-    )
+    Some(total_possible_arrangements(input, true))
 }
 
 #[cfg(test)]
@@ -148,27 +155,181 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_possible_arrangements_simple_match() {
-        let mut calc = ArrangementCalculator::new();
-        assert_eq!(calc.possible_arrangements("#.#.###", "1,1,3"), 1);
-        assert_eq!(calc.possible_arrangements(".#.###.#.######", "1,3,1,6"), 1);
-    }
-
-    #[test]
-    fn test_possible_arrangements_no_match() {
-        let mut calc = ArrangementCalculator::new();
-        assert_eq!(calc.possible_arrangements("##..###", "1,1,3"), 0);
+    fn test_parse_condition_record() {
         assert_eq!(
-            calc.possible_arrangements("#....######..#####.", "1,6,6"),
-            0
+            ".??..??...?##. 1,1,3".parse(),
+            Ok(ConditionRecord {
+                springs: vec![
+                    Spring::Operational,
+                    Spring::Unknown,
+                    Spring::Unknown,
+                    Spring::Operational,
+                    Spring::Operational,
+                    Spring::Unknown,
+                    Spring::Unknown,
+                    Spring::Operational,
+                    Spring::Operational,
+                    Spring::Operational,
+                    Spring::Unknown,
+                    Spring::Damaged,
+                    Spring::Damaged,
+                    Spring::Operational,
+                ],
+                groups: vec![1, 1, 3],
+            })
+        );
+        assert_eq!(
+            "????.######..#####. 1,6,5".parse(),
+            Ok(ConditionRecord {
+                springs: vec![
+                    Spring::Unknown,
+                    Spring::Unknown,
+                    Spring::Unknown,
+                    Spring::Unknown,
+                    Spring::Operational,
+                    Spring::Damaged,
+                    Spring::Damaged,
+                    Spring::Damaged,
+                    Spring::Damaged,
+                    Spring::Damaged,
+                    Spring::Damaged,
+                    Spring::Operational,
+                    Spring::Operational,
+                    Spring::Damaged,
+                    Spring::Damaged,
+                    Spring::Damaged,
+                    Spring::Damaged,
+                    Spring::Damaged,
+                    Spring::Operational,
+                ],
+                groups: vec![1, 6, 5],
+            })
         );
     }
 
     #[test]
-    fn test_possible_arrangements_with_unknown() {
-        let mut calc = ArrangementCalculator::new();
-        assert_eq!(calc.possible_arrangements(".??..??...?##.", "1,1,3"), 4);
-        assert_eq!(calc.possible_arrangements("?###????????", "3,2,1"), 10);
+    fn test_possible_arrangements_simple_match() {
+        let record = ConditionRecord {
+            springs: vec![
+                Spring::Damaged,
+                Spring::Operational,
+                Spring::Damaged,
+                Spring::Operational,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+            ],
+            groups: vec![1, 1, 3],
+        };
+        assert_eq!(record.possible_arrangements(), 1);
+
+        let record = ConditionRecord {
+            springs: vec![
+                Spring::Operational,
+                Spring::Damaged,
+                Spring::Operational,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Operational,
+                Spring::Damaged,
+                Spring::Operational,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+            ],
+            groups: vec![1, 3, 1, 6],
+        };
+        assert_eq!(record.possible_arrangements(), 1);
+    }
+
+    #[test]
+    fn test_possible_arrangements_no_match() {
+        let record = ConditionRecord {
+            springs: vec![
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Operational,
+                Spring::Operational,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+            ],
+            groups: vec![1, 1, 3],
+        };
+        assert_eq!(record.possible_arrangements(), 0);
+
+        let record = ConditionRecord {
+            springs: vec![
+                Spring::Damaged,
+                Spring::Operational,
+                Spring::Operational,
+                Spring::Operational,
+                Spring::Operational,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Operational,
+                Spring::Operational,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Operational,
+            ],
+            groups: vec![],
+        };
+        assert_eq!(record.possible_arrangements(), 0);
+    }
+
+    #[test]
+    fn test_possible_arrangements_with_unknowns() {
+        let record = ConditionRecord {
+            springs: vec![
+                Spring::Operational,
+                Spring::Unknown,
+                Spring::Unknown,
+                Spring::Operational,
+                Spring::Operational,
+                Spring::Unknown,
+                Spring::Unknown,
+                Spring::Operational,
+                Spring::Operational,
+                Spring::Operational,
+                Spring::Unknown,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Operational,
+            ],
+            groups: vec![1, 1, 3],
+        };
+        assert_eq!(record.possible_arrangements(), 4);
+
+        let record = ConditionRecord {
+            springs: vec![
+                Spring::Unknown,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Damaged,
+                Spring::Unknown,
+                Spring::Unknown,
+                Spring::Unknown,
+                Spring::Unknown,
+                Spring::Unknown,
+                Spring::Unknown,
+                Spring::Unknown,
+                Spring::Unknown,
+            ],
+            groups: vec![3, 2, 1],
+        };
+        assert_eq!(record.possible_arrangements(), 10);
     }
 
     #[test]
@@ -178,16 +339,31 @@ mod tests {
     }
 
     #[test]
-    fn test_possible_arrangements_for_unfolded_line() {
-        let mut calc = ArrangementCalculator::new();
-        assert_eq!(
-            calc.possible_arrangements_for_unfolded_line(".??..??...?##. 1,1,3"),
-            16_384,
-        );
-        assert_eq!(
-            calc.possible_arrangements_for_unfolded_line("?###???????? 3,2,1"),
-            506_250,
-        );
+    fn test_unfold_record() {
+        let record = ConditionRecord {
+            springs: vec![Spring::Operational, Spring::Damaged],
+            groups: vec![1],
+        };
+        let unfolded = ConditionRecord {
+            springs: vec![
+                Spring::Operational,
+                Spring::Damaged,
+                Spring::Unknown,
+                Spring::Operational,
+                Spring::Damaged,
+                Spring::Unknown,
+                Spring::Operational,
+                Spring::Damaged,
+                Spring::Unknown,
+                Spring::Operational,
+                Spring::Damaged,
+                Spring::Unknown,
+                Spring::Operational,
+                Spring::Damaged,
+            ],
+            groups: vec![1, 1, 1, 1, 1],
+        };
+        assert_eq!(record.unfold(), unfolded);
     }
 
     #[test]
