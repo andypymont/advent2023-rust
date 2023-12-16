@@ -152,11 +152,11 @@ impl Contraption {
         }
     }
 
-    fn energised_cells(&self) -> usize {
+    fn energised_cells(&self, start_pos: usize, start_facing: Direction) -> usize {
         let mut visited = EnergisationTracker::new();
         let mut queue = VecDeque::new();
 
-        queue.push_back((0, Direction::East));
+        queue.push_back((start_pos, start_facing));
 
         while let Some((pos, direction)) = queue.pop_front() {
             if !visited.visit(pos, direction) {
@@ -177,6 +177,25 @@ impl Contraption {
         }
 
         visited.energised_cells()
+    }
+
+    fn most_energised_cells(&self) -> usize {
+        let mut most = 0;
+
+        for row_or_col in 0..GRID_SIZE {
+            most = most.max(self.energised_cells(row_or_col, Direction::South));
+
+            let south = (GRID_SIZE * GRID_SIZE) - 1 - row_or_col;
+            most = most.max(self.energised_cells(south, Direction::North));
+
+            let west = GRID_SIZE * row_or_col;
+            most = most.max(self.energised_cells(west, Direction::East));
+
+            let east = west + GRID_SIZE - 1;
+            most = most.max(self.energised_cells(east, Direction::West));
+        }
+
+        most
     }
 }
 
@@ -218,15 +237,19 @@ impl FromStr for Contraption {
 #[must_use]
 pub fn part_one(input: &str) -> Option<usize> {
     if let Ok(contraption) = Contraption::from_str(input) {
-        Some(contraption.energised_cells())
+        Some(contraption.energised_cells(0, Direction::East))
     } else {
         None
     }
 }
 
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<usize> {
+    if let Ok(contraption) = Contraption::from_str(input) {
+        Some(contraption.most_energised_cells())
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -309,13 +332,12 @@ mod tests {
     #[test]
     fn test_part_one() {
         let result = part_one(&advent_of_code::template::read_file("examples", DAY));
-        let extra = 4 * (GRID_SIZE - 10);
-        assert_eq!(result, Some(46 + extra));
+        assert_eq!(result, Some(446));
     }
 
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(548));
     }
 }
