@@ -83,15 +83,13 @@ impl JourneyVisitTracker {
     }
 
     fn visit(&mut self, state: &JourneyState) -> bool {
-        let row = state.position / GRID_SIZE;
-        let col = state.position % GRID_SIZE;
         let dir = match state.facing {
             Direction::North => 0,
             Direction::East => 1,
             Direction::South => 2,
             Direction::West => 3,
         };
-        let key = (4 * ((row * GRID_SIZE) + col)) + dir;
+        let key = (4 * state.position) + dir;
 
         if self.visited[key] <= state.heat_loss {
             true
