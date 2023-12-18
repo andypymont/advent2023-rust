@@ -14,7 +14,7 @@ enum Direction {
 #[derive(Debug, PartialEq)]
 struct Instruction {
     direction: Direction,
-    distance: i32,
+    distance: i64,
 }
 
 #[derive(Debug, PartialEq)]
@@ -39,7 +39,7 @@ impl FromStr for Instruction {
 
     fn from_str(line: &str) -> Result<Self, Self::Err> {
         let mut direction: Result<Direction, ParseInstructionError> = Err(ParseInstructionError);
-        let mut distance: Result<i32, ParseInstructionError> = Err(ParseInstructionError);
+        let mut distance: Result<i64, ParseInstructionError> = Err(ParseInstructionError);
 
         for (part_ix, part) in line.split_whitespace().enumerate() {
             match part_ix {
@@ -59,11 +59,36 @@ impl FromStr for Instruction {
     }
 }
 
+impl Instruction {
+    fn from_hex_str(line: &str) -> Result<Self, ParseInstructionError> {
+        let Some((_, hex)) = line.split_once('#') else {
+            return Err(ParseInstructionError);
+        };
+        let Some(hex) = hex.strip_suffix(')') else {
+            return Err(ParseInstructionError);
+        };
+
+        let direction = match hex.chars().last() {
+            Some('0') => Ok(Direction::Right),
+            Some('1') => Ok(Direction::Down),
+            Some('2') => Ok(Direction::Left),
+            Some('3') => Ok(Direction::Up),
+            _ => Err(ParseInstructionError),
+        }?;
+        let distance = i64::from_str_radix(&hex[0..5], 16).map_err(|_| ParseInstructionError)?;
+
+        Ok(Self {
+            direction,
+            distance,
+        })
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct Point(i32, i32);
+struct Point(i64, i64);
 
 impl Point {
-    fn distance(self, other: Point) -> u32 {
+    fn distance(self, other: Point) -> u64 {
         self.0.abs_diff(other.0) + self.1.abs_diff(other.1)
     }
 }
@@ -90,7 +115,7 @@ struct Polygon {
 struct PolygonGeometryError;
 
 impl Polygon {
-    fn area(&self) -> u32 {
+    fn area(&self) -> u64 {
         let (a, b) = self
             .points
             .iter()
@@ -102,7 +127,7 @@ impl Polygon {
         a.abs_diff(b) / 2
     }
 
-    fn circumference(&self) -> u32 {
+    fn circumference(&self) -> u64 {
         let (_, circ) = self
             .points
             .iter()
@@ -112,7 +137,7 @@ impl Polygon {
         circ
     }
 
-    fn area_including_circumference(&self) -> u32 {
+    fn area_including_circumference(&self) -> u64 {
         self.area() + (self.circumference() / 2 + 1)
     }
 
@@ -133,17 +158,27 @@ impl Polygon {
     }
 }
 
-#[must_use]
-pub fn part_one(input: &str) -> Option<u32> {
+fn read_instructions(
+    input: &str,
+    swap_elements: bool,
+) -> Result<Vec<Instruction>, ParseInstructionError> {
     let mut instructions = Vec::new();
     for line in input.lines() {
-        if let Ok(instruction) = line.parse() {
-            instructions.push(instruction);
+        let instruction = if swap_elements {
+            Instruction::from_hex_str(line)
         } else {
-            return None;
-        }
+            Instruction::from_str(line)
+        }?;
+        instructions.push(instruction);
     }
+    Ok(instructions)
+}
 
+#[must_use]
+pub fn part_one(input: &str) -> Option<u64> {
+    let Ok(instructions) = read_instructions(input, false) else {
+        return None
+    };
     if let Ok(polygon) = Polygon::from_instructions(&instructions) {
         Some(polygon.area_including_circumference())
     } else {
@@ -152,8 +187,15 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u64> {
+    let Ok(instructions) = read_instructions(input, true) else {
+        return None
+    };
+    if let Ok(polygon) = Polygon::from_instructions(&instructions) {
+        Some(polygon.area_including_circumference())
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -275,8 +317,33 @@ mod tests {
     }
 
     #[test]
+    fn test_instruction_from_hex_str() {
+        assert_eq!(
+            Instruction::from_hex_str("R 6 (#70c710)"),
+            Ok(Instruction {
+                direction: Direction::Right,
+                distance: 461937,
+            }),
+        );
+        assert_eq!(
+            Instruction::from_hex_str("U 2 (#caa171)"),
+            Ok(Instruction {
+                direction: Direction::Down,
+                distance: 829975,
+            }),
+        );
+        assert_eq!(
+            Instruction::from_hex_str("U 2 (#7a21e3)"),
+            Ok(Instruction {
+                direction: Direction::Up,
+                distance: 500254,
+            }),
+        );
+    }
+
+    #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(952_408_144_115));
     }
 }
