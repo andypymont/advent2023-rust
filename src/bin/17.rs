@@ -108,17 +108,17 @@ struct City {
 }
 
 impl City {
-    fn minimal_heat_loss(&self) -> Option<u32> {
+    fn minimal_heat_loss(&self, min_dist: usize, max_dist: usize) -> Option<u32> {
         let mut visited = JourneyVisitTracker::new();
         let mut queue = BinaryHeap::new();
-        for state in self.initial_states() {
+        for state in self.initial_states(min_dist, max_dist) {
             if !visited.visit(&state) {
                 queue.push(state);
             }
         }
 
         while let Some(state) = queue.pop() {
-            for reachable in self.reachable_states(&state) {
+            for reachable in self.reachable_states(&state, min_dist, max_dist) {
                 if !visited.visit(&reachable) {
                     queue.push(reachable);
                 }
@@ -128,85 +128,84 @@ impl City {
         visited.minimum((GRID_SIZE * GRID_SIZE) - 1)
     }
 
-    fn initial_states(&self) -> impl Iterator<Item = JourneyState> + '_ {
-        [Direction::East, Direction::South]
-            .into_iter()
-            .flat_map(move |facing| {
-                let mut states = Vec::new();
-                let mut position = 0;
-                let mut heat_loss = 0;
-                for _ in 1..=3 {
-                    position = if let Some(new_pos) = Self::step(position, facing) {
-                        new_pos
-                    } else {
-                        break;
-                    };
-                    heat_loss += self.grid[position];
-                    states.push(JourneyState {
-                        position,
-                        facing,
-                        heat_loss,
-                    });
+    fn states_in_directions<'a>(
+        &'a self,
+        position: usize,
+        heat_loss: u32,
+        directions: impl Iterator<Item = Direction> + 'a,
+        min_dist: usize,
+        max_dist: usize,
+    ) -> impl Iterator<Item = JourneyState> + 'a {
+        directions.flat_map(move |facing| {
+            let mut states = Vec::new();
+            let mut extra_loss = 0;
+            for dist in 1..=max_dist {
+                if let Some(position) = City::step(position, facing, dist) {
+                    extra_loss += self.grid[position];
+                    if dist >= min_dist {
+                        states.push(JourneyState {
+                            position,
+                            facing,
+                            heat_loss: heat_loss + extra_loss,
+                        });
+                    }
                 }
-                states
-            })
+            }
+            states
+        })
+    }
+
+    fn initial_states(
+        &self,
+        min_dist: usize,
+        max_dist: usize,
+    ) -> impl Iterator<Item = JourneyState> + '_ {
+        self.states_in_directions(
+            0,
+            0,
+            [Direction::East, Direction::South].into_iter(),
+            min_dist,
+            max_dist,
+        )
     }
 
     fn reachable_states<'a>(
         &'a self,
         state: &'a JourneyState,
+        min_dist: usize,
+        max_dist: usize,
     ) -> impl Iterator<Item = JourneyState> + '_ {
-        [state.facing.turn_left(), state.facing.turn_right()]
-            .into_iter()
-            .flat_map(move |facing| {
-                let mut states = Vec::new();
-                let mut position = state.position;
-                let mut loss = 0;
-                for _ in 1..=3 {
-                    position = if let Some(new_pos) = Self::step(position, facing) {
-                        new_pos
-                    } else {
-                        break;
-                    };
-                    loss += self.grid[position];
-                    states.push(JourneyState {
-                        position,
-                        facing,
-                        heat_loss: state.heat_loss + loss,
-                    });
-                }
-                states
-            })
+        self.states_in_directions(
+            state.position,
+            state.heat_loss,
+            [state.facing.turn_left(), state.facing.turn_right()].into_iter(),
+            min_dist,
+            max_dist,
+        )
     }
 
-    fn step(pos: usize, dir: Direction) -> Option<usize> {
+    fn step(pos: usize, dir: Direction, dist: usize) -> Option<usize> {
         let row = pos / GRID_SIZE;
         let col = pos % GRID_SIZE;
         match dir {
-            Direction::North => {
-                if row > 0 {
-                    Some(pos - GRID_SIZE)
-                } else {
-                    None
-                }
-            }
+            Direction::North => pos.checked_sub(GRID_SIZE * dist),
             Direction::East => {
-                if (col + 1) < GRID_SIZE {
-                    Some(pos + 1)
+                if (col + dist) < GRID_SIZE {
+                    Some(pos + dist)
                 } else {
                     None
                 }
             }
             Direction::South => {
-                if (row + 1) < GRID_SIZE {
-                    Some(pos + GRID_SIZE)
+                if (row + dist) < GRID_SIZE {
+                    Some(pos + (GRID_SIZE * dist))
                 } else {
                     None
                 }
             }
             Direction::West => {
-                if col > 0 {
-                    Some(pos - 1)
+                if col.checked_sub(dist).is_some() {
+                    Some(pos - dist)
                 } else {
                     None
                 }
@@ -241,15 +240,19 @@ impl FromStr for City {
 #[must_use]
 pub fn part_one(input: &str) -> Option<u32> {
     if let Ok(city) = City::from_str(input) {
-        city.minimal_heat_loss()
+        city.minimal_heat_loss(1, 3)
     } else {
         None
     }
 }
 
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u32> {
+    if let Ok(city) = City::from_str(input) {
+        city.minimal_heat_loss(4, 10)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -308,35 +311,35 @@ mod tests {
     #[test]
     fn test_city_step() {
         assert_eq!(
-            City::step(position(2, 5), Direction::North),
+            City::step(position(2, 5), Direction::North, 1),
             Some(position(1, 5))
         );
         assert_eq!(
-            City::step(position(3, 7), Direction::East),
+            City::step(position(3, 7), Direction::East, 1),
             Some(position(3, 8))
         );
         assert_eq!(
-            City::step(position(1, 13), Direction::South),
+            City::step(position(1, 13), Direction::South, 1),
             Some(position(2, 13))
         );
         assert_eq!(
-            City::step(position(0, 9), Direction::West),
+            City::step(position(0, 9), Direction::West, 1),
             Some(position(0, 8))
         );
     }
 
     #[test]
     fn test_city_step_oob() {
-        assert_eq!(City::step(position(0, 4), Direction::North), None);
+        assert_eq!(City::step(position(0, 4), Direction::North, 1), None);
         assert_eq!(
-            City::step(position(4, GRID_SIZE - 1), Direction::East),
+            City::step(position(4, GRID_SIZE - 1), Direction::East, 1),
             None
         );
         assert_eq!(
-            City::step(position(GRID_SIZE - 1, 12), Direction::South),
+            City::step(position(GRID_SIZE - 1, 12), Direction::South, 1),
             None
         );
-        assert_eq!(City::step(position(1, 0), Direction::West), None);
+        assert_eq!(City::step(position(1, 0), Direction::West, 1), None);
     }
 
     #[test]
@@ -384,7 +387,7 @@ mod tests {
             facing: Direction::East,
             heat_loss: 15,
         };
-        let reachable: Vec<JourneyState> = city.reachable_states(&state).collect();
+        let reachable: Vec<JourneyState> = city.reachable_states(&state, 1, 3).collect();
         assert_eq!(
             reachable,
             vec![
@@ -461,8 +464,89 @@ mod tests {
     }
 
     #[test]
+    fn test_initial_states_mega_crucible() {
+        let city = example_city();
+        let initial: Vec<JourneyState> = city.initial_states(4, 10).collect();
+        assert_eq!(
+            initial,
+            vec![
+                JourneyState {
+                    position: position(0, 4),
+                    facing: Direction::East,
+                    heat_loss: 12,
+                },
+                JourneyState {
+                    position: position(0, 5),
+                    facing: Direction::East,
+                    heat_loss: 15,
+                },
+                JourneyState {
+                    position: position(0, 6),
+                    facing: Direction::East,
+                    heat_loss: 17,
+                },
+                JourneyState {
+                    position: position(0, 7),
+                    facing: Direction::East,
+                    heat_loss: 20,
+                },
+                JourneyState {
+                    position: position(0, 8),
+                    facing: Direction::East,
+                    heat_loss: 21,
+                },
+                JourneyState {
+                    position: position(0, 9),
+                    facing: Direction::East,
+                    heat_loss: 22,
+                },
+                JourneyState {
+                    position: position(0, 10),
+                    facing: Direction::East,
+                    heat_loss: 25,
+                },
+                JourneyState {
+                    position: position(4, 0),
+                    facing: Direction::South,
+                    heat_loss: 13,
+                },
+                JourneyState {
+                    position: position(5, 0),
+                    facing: Direction::South,
+                    heat_loss: 14,
+                },
+                JourneyState {
+                    position: position(6, 0),
+                    facing: Direction::South,
+                    heat_loss: 18,
+                },
+                JourneyState {
+                    position: position(7, 0),
+                    facing: Direction::South,
+                    heat_loss: 21,
+                },
+                JourneyState {
+                    position: position(8, 0),
+                    facing: Direction::South,
+                    heat_loss: 25,
+                },
+                JourneyState {
+                    position: position(9, 0),
+                    facing: Direction::South,
+                    heat_loss: 29,
+                },
+                JourneyState {
+                    position: position(10, 0),
+                    facing: Direction::South,
+                    heat_loss: 30,
+                },
+            ],
+        );
+    }
+
+    #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(51));
     }
 }
