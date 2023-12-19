@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::str::FromStr;
 
 advent_of_code::solution!(19);
@@ -39,6 +39,31 @@ impl Workflow {
         }
         self.default
     }
+
+    fn process_tesseract(&self, tesseract: Tesseract, queue: &mut VecDeque<PossibilityState>) {
+        let mut next_tesseract = Some(tesseract);
+
+        for step in &self.steps {
+            let Some(consider) = next_tesseract else {
+                break;
+            };
+
+            let (split, retain) = consider.split(step);
+
+            if let Some(split) = split {
+                queue.push_back(split);
+            }
+
+            next_tesseract = retain;
+        }
+
+        if let Some(default_tesseract) = next_tesseract {
+            queue.push_back(PossibilityState {
+                tesseract: default_tesseract,
+                workflow_name: self.default,
+            });
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -65,6 +90,110 @@ impl Part {
 
     fn total(&self) -> u32 {
         self.x + self.m + self.a + self.s
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct NumberRange(u32, u32);
+
+impl NumberRange {
+    fn range(self) -> u32 {
+        1 + self.1 - self.0
+    }
+
+    fn split(self, comparison: Ordering, comparator: u32) -> (Option<Self>, Option<Self>) {
+        let mut split: Option<Self> = None;
+        let mut retain: Option<Self> = None;
+
+        match comparison {
+            Ordering::Greater => {
+                if comparator >= self.1 {
+                    retain = Some(self);
+                } else if comparator < self.0 {
+                    split = Some(self);
+                } else {
+                    retain = Some(Self(self.0, comparator));
+                    split = Some(Self(comparator + 1, self.1));
+                }
+            }
+            Ordering::Less => {
+                if comparator > self.1 {
+                    split = Some(self);
+                } else if comparator <= self.0 {
+                    retain = Some(self);
+                } else {
+                    retain = Some(Self(comparator, self.1));
+                    split = Some(Self(self.0, comparator.saturating_sub(1)));
+                }
+            }
+            Ordering::Equal => (),
+        }
+
+        (split, retain)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct Tesseract {
+    x: NumberRange,
+    m: NumberRange,
+    a: NumberRange,
+    s: NumberRange,
+}
+
+#[derive(Debug, PartialEq)]
+struct PossibilityState {
+    tesseract: Tesseract,
+    workflow_name: WorkflowName,
+}
+
+impl Tesseract {
+    fn initial() -> Self {
+        Self {
+            x: NumberRange(1, 4000),
+            m: NumberRange(1, 4000),
+            a: NumberRange(1, 4000),
+            s: NumberRange(1, 4000),
+        }
+    }
+
+    fn get(&self, property: &Property) -> NumberRange {
+        match property {
+            Property::X => self.x,
+            Property::M => self.m,
+            Property::A => self.a,
+            Property::S => self.s,
+        }
+    }
+
+    fn with_property_replaced(&self, property: &Property, range: NumberRange) -> Self {
+        match property {
+            Property::X => Self { x: range, ..*self },
+            Property::M => Self { m: range, ..*self },
+            Property::A => Self { a: range, ..*self },
+            Property::S => Self { s: range, ..*self },
+        }
+    }
+
+    fn split(&self, workstep: &WorkStep) -> (Option<PossibilityState>, Option<Tesseract>) {
+        let range = self.get(&workstep.property);
+        let (split, retain) = range.split(workstep.comparison, workstep.comparator);
+
+        let split = split.map(|rg| PossibilityState {
+            tesseract: self.with_property_replaced(&workstep.property, rg),
+            workflow_name: workstep.target,
+        });
+        let retain = retain.map(|rg| self.with_property_replaced(&workstep.property, rg));
+
+        (split, retain)
+    }
+
+    fn volume(&self) -> u64 {
+        let x = u64::from(self.x.range());
+        let m = u64::from(self.m.range());
+        let a = u64::from(self.a.range());
+        let s = u64::from(self.s.range());
+        x * m * a * s
     }
 }
 
@@ -98,6 +227,28 @@ impl WorkflowSystem {
                 }
             })
             .sum()
+    }
+
+    fn accepted_possibilities(&self) -> u64 {
+        let mut total = 0;
+        let mut queue = VecDeque::new();
+        queue.push_back(PossibilityState {
+            tesseract: Tesseract::initial(),
+            workflow_name: WorkflowName('i', 'n', ' '),
+        });
+
+        while let Some(state) = queue.pop_front() {
+            if state.workflow_name == ACCEPTED {
+                total += state.tesseract.volume();
+                continue;
+            }
+
+            if let Some(workflow) = self.workflows.get(&state.workflow_name) {
+                workflow.process_tesseract(state.tesseract, &mut queue);
+            }
+        }
+
+        total
     }
 }
 
@@ -255,8 +406,12 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u64> {
+    if let Ok(system) = WorkflowSystem::from_str(input) {
+        Some(system.accepted_possibilities())
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -705,8 +860,148 @@ mod tests {
     }
 
     #[test]
+    fn test_number_range_split() {
+        let range = NumberRange(1, 4000);
+        assert_eq!(
+            range.split(Ordering::Less, 2000),
+            (Some(NumberRange(1, 1999)), Some(NumberRange(2000, 4000))),
+        );
+        assert_eq!(
+            range.split(Ordering::Greater, 3707),
+            (Some(NumberRange(3708, 4000)), Some(NumberRange(1, 3707))),
+        );
+        assert_eq!(
+            range.split(Ordering::Less, 5000),
+            (Some(NumberRange(1, 4000)), None),
+        );
+        assert_eq!(
+            range.split(Ordering::Greater, 4000),
+            (None, Some(NumberRange(1, 4000))),
+        );
+    }
+
+    #[test]
+    fn test_tesseract_volume() {
+        let tesseract = Tesseract {
+            x: NumberRange(1, 200),
+            m: NumberRange(12, 17),
+            a: NumberRange(1, 100),
+            s: NumberRange(13, 672),
+        };
+        assert_eq!(tesseract.volume(), 79_200_000);
+    }
+
+    #[test]
+    fn test_tesseract_split() {
+        let tesseract = Tesseract {
+            x: NumberRange(1, 4000),
+            m: NumberRange(1, 4000),
+            a: NumberRange(1, 4000),
+            s: NumberRange(1, 4000),
+        };
+        let workstep = WorkStep {
+            property: Property::A,
+            comparison: Ordering::Greater,
+            comparator: 2000,
+            target: WorkflowName('A', 'B', 'C'),
+        };
+        assert_eq!(
+            tesseract.split(&workstep),
+            (
+                Some(PossibilityState {
+                    tesseract: Tesseract {
+                        x: NumberRange(1, 4000),
+                        m: NumberRange(1, 4000),
+                        a: NumberRange(2001, 4000),
+                        s: NumberRange(1, 4000),
+                    },
+                    workflow_name: WorkflowName('A', 'B', 'C'),
+                }),
+                Some(Tesseract {
+                    x: NumberRange(1, 4000),
+                    m: NumberRange(1, 4000),
+                    a: NumberRange(1, 2000),
+                    s: NumberRange(1, 4000),
+                }),
+            ),
+        );
+    }
+
+    #[test]
+    fn test_process_tesserat() {
+        let state = PossibilityState {
+            tesseract: Tesseract {
+                x: NumberRange(1, 4000),
+                m: NumberRange(1, 4000),
+                a: NumberRange(1, 4000),
+                s: NumberRange(1, 4000),
+            },
+            workflow_name: WorkflowName('p', 'x', ' '),
+        };
+        let workflow = Workflow {
+            name: WorkflowName('p', 'x', ' '),
+            steps: vec![
+                WorkStep {
+                    property: Property::A,
+                    comparison: Ordering::Less,
+                    comparator: 2006,
+                    target: WorkflowName('q', 'k', 'q'),
+                },
+                WorkStep {
+                    property: Property::M,
+                    comparison: Ordering::Greater,
+                    comparator: 2090,
+                    target: WorkflowName('A', ' ', ' '),
+                },
+            ],
+            default: WorkflowName('r', 'f', 'g'),
+        };
+
+        let mut queue = VecDeque::new();
+        workflow.process_tesseract(state.tesseract, &mut queue);
+
+        assert_eq!(
+            queue.pop_front(),
+            Some(PossibilityState {
+                tesseract: Tesseract {
+                    x: NumberRange(1, 4000),
+                    m: NumberRange(1, 4000),
+                    a: NumberRange(1, 2005),
+                    s: NumberRange(1, 4000),
+                },
+                workflow_name: WorkflowName('q', 'k', 'q'),
+            }),
+        );
+        assert_eq!(
+            queue.pop_front(),
+            Some(PossibilityState {
+                tesseract: Tesseract {
+                    x: NumberRange(1, 4000),
+                    m: NumberRange(2091, 4000),
+                    a: NumberRange(2006, 4000),
+                    s: NumberRange(1, 4000),
+                },
+                workflow_name: WorkflowName('A', ' ', ' '),
+            }),
+        );
+        assert_eq!(
+            queue.pop_front(),
+            Some(PossibilityState {
+                tesseract: Tesseract {
+                    x: NumberRange(1, 4000),
+                    m: NumberRange(1, 2090),
+                    a: NumberRange(2006, 4000),
+                    s: NumberRange(1, 4000),
+                },
+                workflow_name: WorkflowName('r', 'f', 'g'),
+            }),
+        );
+        assert_eq!(queue.pop_front(), None,);
+    }
+
+    #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(167_409_079_868_000));
     }
 }
