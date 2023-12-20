@@ -70,6 +70,40 @@ struct ModuleSystem {
     modules: HashMap<ModuleName, Module>,
 }
 
+fn gcd(a: u64, b: u64) -> u64 {
+    let mut a = a;
+    let mut b = b;
+
+    if a == 0 || b == 0 {
+        a | b
+    } else {
+        let shift = (a | b).trailing_zeros();
+
+        a >>= a.trailing_zeros();
+        b >>= b.trailing_zeros();
+
+        while a != b {
+            if a > b {
+                a -= b;
+                a >>= a.trailing_zeros();
+            } else {
+                b -= a;
+                b >>= b.trailing_zeros();
+            }
+        }
+
+        a << shift
+    }
+}
+
+fn lcm(a: u64, b: u64) -> u64 {
+    if a == 0 && b == 0 {
+        0
+    } else {
+        a * (b / gcd(a, b))
+    }
+}
+
 impl ModuleSystem {
     fn new() -> Self {
         Self {
@@ -77,7 +111,34 @@ impl ModuleSystem {
         }
     }
 
-    fn press_button(&self, times: usize) -> (u32, u32) {
+    fn find_lcm_of_signals_to_destinations(&self, destinations: &HashSet<ModuleName>) -> u64 {
+        let mut signal_lcm = 1;
+        let mut to_find = destinations.clone();
+
+        let mut signals = VecDeque::new();
+        let mut flipflop_state: HashMap<ModuleName, bool> = HashMap::new();
+        let mut last_sent: HashMap<ModuleName, Pulse> = HashMap::new();
+
+        for presses in 1.. {
+            signals.push_back(Signal::initial());
+
+            while let Some(signal) = signals.pop_front() {
+                if signal.pulse == Pulse::Low && to_find.contains(&signal.destination) {
+                    to_find.remove(&signal.destination);
+                    signal_lcm = lcm(signal_lcm, presses);
+                    if to_find.is_empty() {
+                        return signal_lcm;
+                    }
+                }
+
+                self.process_signal(&signal, &mut signals, &mut flipflop_state, &mut last_sent);
+            }
+        }
+
+        signal_lcm
+    }
+
+    fn press_button_times(&self, times: usize) -> (u32, u32) {
         let mut low = 0;
         let mut high = 0;
 
@@ -94,37 +155,48 @@ impl ModuleSystem {
                     Pulse::High => high += 1,
                 }
 
-                if let Some(module) = self.modules.get(&signal.destination) {
-                    match &module.module_type {
-                        ModuleType::Broadcaster => {
-                            module.send_signals(signal.pulse, &mut last_sent, &mut signals);
-                        }
-                        ModuleType::FlipFlop => {
-                            if signal.pulse == Pulse::Low {
-                                if *flipflop_state.get(&module.name).unwrap_or(&false) {
-                                    flipflop_state.insert(module.name, false);
-                                    module.send_signals(Pulse::Low, &mut last_sent, &mut signals);
-                                } else {
-                                    flipflop_state.insert(module.name, true);
-                                    module.send_signals(Pulse::High, &mut last_sent, &mut signals);
-                                }
-                            }
-                        }
-                        ModuleType::Conjunction(inputs) => {
-                            if inputs.iter().all(|input| {
-                                last_sent.get(input).unwrap_or(&Pulse::Low) == &Pulse::High
-                            }) {
-                                module.send_signals(Pulse::Low, &mut last_sent, &mut signals);
-                            } else {
-                                module.send_signals(Pulse::High, &mut last_sent, &mut signals);
-                            }
-                        }
-                    }
-                }
+                self.process_signal(&signal, &mut signals, &mut flipflop_state, &mut last_sent);
             }
         }
 
         (low, high)
+    }
+
+    fn process_signal(
+        &self,
+        signal: &Signal,
+        signals: &mut VecDeque<Signal>,
+        flipflop_state: &mut HashMap<ModuleName, bool>,
+        last_sent: &mut HashMap<ModuleName, Pulse>,
+    ) {
+        if let Some(module) = self.modules.get(&signal.destination) {
+            match &module.module_type {
+                ModuleType::Broadcaster => {
+                    module.send_signals(signal.pulse, last_sent, signals);
+                }
+                ModuleType::FlipFlop => {
+                    if signal.pulse == Pulse::Low {
+                        if *flipflop_state.get(&module.name).unwrap_or(&false) {
+                            flipflop_state.insert(module.name, false);
+                            module.send_signals(Pulse::Low, last_sent, signals);
+                        } else {
+                            flipflop_state.insert(module.name, true);
+                            module.send_signals(Pulse::High, last_sent, signals);
+                        }
+                    }
+                }
+                ModuleType::Conjunction(inputs) => {
+                    if inputs
+                        .iter()
+                        .all(|input| last_sent.get(input).unwrap_or(&Pulse::Low) == &Pulse::High)
+                    {
+                        module.send_signals(Pulse::Low, last_sent, signals);
+                    } else {
+                        module.send_signals(Pulse::High, last_sent, signals);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -214,7 +286,7 @@ impl FromStr for ModuleSystem {
 #[must_use]
 pub fn part_one(input: &str) -> Option<u32> {
     if let Ok(system) = ModuleSystem::from_str(input) {
-        let (low, high) = system.press_button(1000);
+        let (low, high) = system.press_button_times(1000);
         Some(low * high)
     } else {
         None
@@ -222,7 +294,19 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u32> {
+pub fn part_two(input: &str) -> Option<u64> {
+    if let Ok(system) = ModuleSystem::from_str(input) {
+        let seek = ModuleName::Other('r', 'x');
+        if let Some(module) = system
+            .modules
+            .values()
+            .find(|m| m.destinations.contains(&seek))
+        {
+            if let ModuleType::Conjunction(sources) = &module.module_type {
+                return Some(system.find_lcm_of_signals_to_destinations(sources));
+            }
+        }
+    }
     None
 }
 
@@ -347,10 +431,13 @@ mod tests {
 
     #[test]
     fn test_system_from_str() {
-        assert_eq!(
-            ModuleSystem::from_str(&advent_of_code::template::read_file("examples", DAY)),
-            Ok(example_system()),
-        )
+        let example_str = "broadcaster -> aa\n\
+                           %aa -> iv, cn\n\
+                           &iv -> bb\n\
+                           %bb -> cn\n\
+                           &cn -> op";
+
+        assert_eq!(ModuleSystem::from_str(example_str), Ok(example_system()),)
     }
 
     #[test]
@@ -384,20 +471,20 @@ mod tests {
     }
 
     #[test]
-    fn test_system_press_button() {
+    fn test_system_press_button_times() {
         let system = example_system();
-        assert_eq!(system.press_button(1000), (4250, 2750));
+        assert_eq!(system.press_button_times(1000), (4250, 2750));
     }
 
     #[test]
     fn test_part_one() {
         let result = part_one(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, Some(11_687_500));
+        assert_eq!(result, Some(219_152_390));
     }
 
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(14_182_027));
     }
 }

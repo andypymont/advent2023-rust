@@ -1,5 +1,30 @@
-broadcaster -> aa
-%aa -> iv, cn
-&iv -> bb
-%bb -> cn
-&cn -> op
+broadcaster -> aa, bb
+%aa -> ab, ac
+&ab -> ad, aa, ae, af, ag, ac, ah
+%ac -> ah
+%ad -> ai
+%ae -> aj
+&af -> op
+%ag -> ak
+%ah -> ad
+%ai -> ae, ab
+%aj -> al, ab
+%ak -> am, ab
+%al -> ag, ab
+%am -> ab, an
+%an -> ab
+%bb -> bc, bd
+&bc -> be, bf, bb, bg, bh, bi
+%bd -> be, bc
+%be -> bj
+%bf -> bg
+%bg -> bk
+%bh -> bl
+&bi -> op
+%bj -> bc, bm
+%bk -> bc, bh
+%bl -> bc, bn
+%bm -> bc, bf
+%bn -> bc, bo
+%bo -> bc
+&op -> rx
