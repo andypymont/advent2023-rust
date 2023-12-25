@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::str::FromStr;
 
 advent_of_code::solution!(23);
@@ -21,6 +21,38 @@ const COMPASS: [Direction; 4] = [
 ];
 
 #[derive(Debug, PartialEq)]
+struct GraphMappingState {
+    source: usize,
+    position: usize,
+    steps: u32,
+    visited: [bool; GRID_SIZE * GRID_SIZE],
+}
+
+impl GraphMappingState {
+    fn new(position: usize) -> Self {
+        let mut visited = [false; GRID_SIZE * GRID_SIZE];
+        visited[position] = true;
+        Self {
+            source: position,
+            position,
+            steps: 0,
+            visited,
+        }
+    }
+
+    fn visit(&self, position: usize) -> Self {
+        let mut visited = self.visited;
+        visited[position] = true;
+        Self {
+            source: self.source,
+            position,
+            steps: self.steps + 1,
+            visited,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 struct HikeState {
     position: usize,
     steps: u32,
@@ -28,12 +60,22 @@ struct HikeState {
 }
 
 impl HikeState {
-    fn visit(&self, position: usize) -> Self {
+    fn new(position: usize) -> Self {
+        let mut visited = [false; GRID_SIZE * GRID_SIZE];
+        visited[position] = true;
+        Self {
+            position,
+            steps: 0,
+            visited,
+        }
+    }
+
+    fn visit(&self, position: usize, steps: u32) -> Self {
         let mut visited = self.visited;
         visited[position] = true;
         Self {
             position,
-            steps: self.steps + 1,
+            steps: self.steps + steps,
             visited,
         }
     }
@@ -61,11 +103,103 @@ impl Trail {
 }
 
 #[derive(Debug, PartialEq)]
+struct TrailGraph {
+    start: usize,
+    finish: usize,
+    nodes: HashMap<usize, HashMap<usize, u32>>,
+}
+
+impl TrailGraph {
+    fn add_connection(&mut self, source: usize, destination: usize, distance: u32) {
+        self.nodes
+            .entry(source)
+            .or_default()
+            .insert(destination, distance);
+    }
+
+    fn longest_hike(&self) -> Option<u32> {
+        let mut hikes = Vec::new();
+        let mut queue = VecDeque::new();
+        queue.push_back(HikeState::new(self.start));
+
+        while let Some(state) = queue.pop_front() {
+            if state.position == self.finish {
+                hikes.push(state.steps);
+            } else if let Some(node) = self.nodes.get(&state.position) {
+                for (position, steps) in node {
+                    if !state.visited[*position] {
+                        queue.push_back(state.visit(*position, *steps));
+                    }
+                }
+            }
+        }
+
+        hikes.into_iter().max()
+    }
+}
+
+#[derive(Debug, PartialEq)]
 struct TrailMap {
     trails: [Trail; GRID_SIZE * GRID_SIZE],
 }
 
 impl TrailMap {
+    fn graph(&self) -> TrailGraph {
+        let (start, finish) = self.trails.iter().enumerate().fold(
+            (0, 0),
+            |(start, finish), (pos, trail)| match trail {
+                Trail::Start => (pos, finish),
+                Trail::Finish => (start, pos),
+                _ => (start, finish),
+            },
+        );
+        let mut graph = TrailGraph {
+            start,
+            finish,
+            nodes: HashMap::new(),
+        };
+
+        let mut queued = [false; GRID_SIZE * GRID_SIZE];
+        let mut queue = VecDeque::new();
+        queue.push_back(GraphMappingState::new(start));
+        queued[start] = true;
+
+        while let Some(state) = queue.pop_front() {
+            let trail = self.trails[state.position];
+            let exits: Vec<usize> = COMPASS
+                .iter()
+                .filter_map(move |direction| {
+                    if !trail.can_exit_in_direction(direction) {
+                        return None;
+                    }
+                    Self::step_in_direction(state.position, direction)
+                        .filter(|pos| self.trails[*pos] != Trail::Forest)
+                })
+                .collect();
+
+            if state.position != state.source
+                && (exits.len() > 2 || trail == Trail::Start || trail == Trail::Finish)
+            {
+                // new point of interest found; record route, then initiate a new
+                // search from this POI if we haven't already
+                graph.add_connection(state.source, state.position, state.steps);
+                if !queued[state.position] {
+                    queue.push_back(GraphMappingState::new(state.position));
+                    queued[state.position] = true;
+                }
+            } else {
+                // not at a new point of interest: keep exploring this route
+                for new_pos in exits {
+                    if !state.visited[new_pos] {
+                        queue.push_back(state.visit(new_pos));
+                    }
+                }
+            }
+        }
+
+        graph
+    }
+
     fn step_in_direction(pos: usize, direction: &Direction) -> Option<usize> {
         let row = pos / GRID_SIZE;
         let col = pos % GRID_SIZE;
@@ -100,63 +234,6 @@ impl TrailMap {
                 }
             }
         }
-    }
-
-    fn initial_position(&self) -> Option<HikeState> {
-        self.trails
-            .iter()
-            .enumerate()
-            .find_map(|(position, trail)| {
-                if trail == &Trail::Start {
-                    Some(HikeState {
-                        position,
-                        steps: 0,
-                        visited: [false; GRID_SIZE * GRID_SIZE],
-                    })
-                } else {
-                    None
-                }
-            })
-    }
-
-    fn reachable_states<'a>(
-        &'a self,
-        state: &'a HikeState,
-    ) -> impl Iterator<Item = HikeState> + 'a {
-        COMPASS.iter().filter_map(move |direction| {
-            if !self.trails[state.position].can_exit_in_direction(direction) {
-                return None;
-            }
-
-            let Some(pos) = Self::step_in_direction(state.position, direction) else {
-                return None;
-            };
-
-            if state.visited[pos] {
-                None
-            } else {
-                Some(state.visit(pos))
-            }
-        })
-    }
-
-    fn longest_hike(&self) -> Option<u32> {
-        let mut hikes = Vec::new();
-        let mut queue = VecDeque::new();
-        let Some(initial) = self.initial_position() else {
-            return None;
-        };
-        queue.push_back(initial);
-
-        while let Some(state) = queue.pop_front() {
-            if self.trails[state.position] == Trail::Finish {
-                hikes.push(state.steps);
-            } else {
-                queue.extend(self.reachable_states(&state));
-            }
-        }
-
-        hikes.iter().max().copied()
     }
 }
 
@@ -202,7 +279,8 @@ impl FromStr for TrailMap {
 #[must_use]
 pub fn part_one(input: &str) -> Option<u32> {
     if let Ok(trail_map) = TrailMap::from_str(input) {
-        trail_map.longest_hike()
+        let graph = trail_map.graph();
+        graph.longest_hike()
     } else {
         None
     }
@@ -386,12 +464,39 @@ mod tests {
         TrailMap { trails }
     }
 
+    fn example_trail_graph() -> TrailGraph {
+        let mut graph = TrailGraph {
+            start: position(0, 1),
+            finish: position(22, 21),
+            nodes: HashMap::new(),
+        };
+        graph.add_connection(position(0, 1), position(5, 3), 15);
+        graph.add_connection(position(5, 3), position(3, 11), 22);
+        graph.add_connection(position(5, 3), position(13, 5), 22);
+        graph.add_connection(position(3, 11), position(13, 13), 24);
+        graph.add_connection(position(3, 11), position(11, 21), 30);
+        graph.add_connection(position(11, 21), position(19, 19), 10);
+        graph.add_connection(position(13, 5), position(13, 13), 12);
+        graph.add_connection(position(13, 5), position(19, 13), 38);
+        graph.add_connection(position(13, 13), position(11, 21), 18);
+        graph.add_connection(position(13, 13), position(19, 13), 10);
+        graph.add_connection(position(19, 13), position(19, 19), 10);
+        graph.add_connection(position(19, 19), position(22, 21), 5);
+        graph
+    }
+
     #[test]
     fn test_parse_trail_map() {
         assert_eq!(
             TrailMap::from_str(&advent_of_code::template::read_file("examples", DAY)),
             Ok(example_trail_map()),
         );
+    }
+
+    #[test]
+    fn test_trail_map_graph() {
+        let trail_map = example_trail_map();
+        assert_eq!(trail_map.graph(), example_trail_graph(),);
     }
 
     #[test]
