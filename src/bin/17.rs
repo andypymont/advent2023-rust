@@ -54,14 +54,7 @@ impl Ord for JourneyState {
 
 impl PartialOrd for JourneyState {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        // for use in max heap, so less heat_loss = better/greater
-        match self.heat_loss.cmp(&other.heat_loss) {
-            Ordering::Greater => Some(Ordering::Less),
-            Ordering::Less => Some(Ordering::Greater),
-            Ordering::Equal => {
-                (self.position, self.facing).partial_cmp(&(other.position, other.facing))
-            }
-        }
+        Some(self.cmp(other))
     }
 }
 

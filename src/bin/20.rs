@@ -31,7 +31,7 @@ impl ModuleType {
 #[derive(Debug, PartialEq)]
 struct Module {
     name: ModuleName,
-    module_type: ModuleType,
+    modtype: ModuleType,
     destinations: HashSet<ModuleName>,
 }
 
@@ -170,7 +170,7 @@ impl ModuleSystem {
         last_sent: &mut HashMap<ModuleName, Pulse>,
     ) {
         if let Some(module) = self.modules.get(&signal.destination) {
-            match &module.module_type {
+            match &module.modtype {
                 ModuleType::Broadcaster => {
                     module.send_signals(signal.pulse, last_sent, signals);
                 }
@@ -228,7 +228,7 @@ impl FromStr for Module {
             return Err(ParseModuleError);
         };
 
-        let (name, module_type) = if details == "broadcaster" {
+        let (name, modtype) = if details == "broadcaster" {
             (ModuleName::Broadcaster, ModuleType::Broadcaster)
         } else if let Some(name) = details.strip_prefix('%') {
             let name = ModuleName::from_str(name)?;
@@ -248,7 +248,7 @@ impl FromStr for Module {
 
         Ok(Self {
             name,
-            module_type,
+            modtype,
             destinations,
         })
     }
@@ -273,7 +273,7 @@ impl FromStr for ModuleSystem {
         }
         for (output, input) in connections {
             if let Some(input) = system.modules.get_mut(&input) {
-                if let ModuleType::Conjunction(ref mut tracker) = &mut input.module_type {
+                if let ModuleType::Conjunction(ref mut tracker) = &mut input.modtype {
                     tracker.insert(output);
                 }
             }
@@ -302,7 +302,7 @@ pub fn part_two(input: &str) -> Option<u64> {
             .values()
             .find(|m| m.destinations.contains(&seek))
         {
-            if let ModuleType::Conjunction(sources) = &module.module_type {
+            if let ModuleType::Conjunction(sources) = &module.modtype {
                 return Some(system.find_lcm_of_signals_to_destinations(sources));
             }
         }
@@ -332,7 +332,7 @@ mod tests {
             Module::from_str("%aa -> bb"),
             Ok(Module {
                 name: ModuleName::Other('a', 'a'),
-                module_type: ModuleType::FlipFlop,
+                modtype: ModuleType::FlipFlop,
                 destinations,
             }),
         );
@@ -344,7 +344,7 @@ mod tests {
             Module::from_str("&bb -> cc, dd"),
             Ok(Module {
                 name: ModuleName::Other('b', 'b'),
-                module_type: ModuleType::new_conjunction(),
+                modtype: ModuleType::new_conjunction(),
                 destinations,
             }),
         );
@@ -357,7 +357,7 @@ mod tests {
             Module::from_str("broadcaster -> aa, bb, cc"),
             Ok(Module {
                 name: ModuleName::Broadcaster,
-                module_type: ModuleType::Broadcaster,
+                modtype: ModuleType::Broadcaster,
                 destinations,
             }),
         );
@@ -372,7 +372,7 @@ mod tests {
             ModuleName::Broadcaster,
             Module {
                 name: ModuleName::Broadcaster,
-                module_type: ModuleType::Broadcaster,
+                modtype: ModuleType::Broadcaster,
                 destinations,
             },
         );
@@ -384,7 +384,7 @@ mod tests {
             ModuleName::Other('a', 'a'),
             Module {
                 name: ModuleName::Other('a', 'a'),
-                module_type: ModuleType::FlipFlop,
+                modtype: ModuleType::FlipFlop,
                 destinations,
             },
         );
@@ -397,7 +397,7 @@ mod tests {
             ModuleName::Other('i', 'v'),
             Module {
                 name: ModuleName::Other('i', 'v'),
-                module_type: ModuleType::Conjunction(data),
+                modtype: ModuleType::Conjunction(data),
                 destinations,
             },
         );
@@ -408,7 +408,7 @@ mod tests {
             ModuleName::Other('b', 'b'),
             Module {
                 name: ModuleName::Other('b', 'b'),
-                module_type: ModuleType::FlipFlop,
+                modtype: ModuleType::FlipFlop,
                 destinations,
             },
         );
@@ -422,7 +422,7 @@ mod tests {
             ModuleName::Other('c', 'n'),
             Module {
                 name: ModuleName::Other('c', 'n'),
-                module_type: ModuleType::Conjunction(data),
+                modtype: ModuleType::Conjunction(data),
                 destinations,
             },
         );
@@ -447,7 +447,7 @@ mod tests {
         destinations.insert(ModuleName::Other('x', 'y'));
         let module = Module {
             name: ModuleName::Broadcaster,
-            module_type: ModuleType::Broadcaster,
+            modtype: ModuleType::Broadcaster,
             destinations,
         };
 

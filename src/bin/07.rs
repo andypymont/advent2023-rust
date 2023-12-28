@@ -47,7 +47,7 @@ impl HandType {
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct Hand {
-    hand_type: HandType,
+    htype: HandType,
     cards: [usize; 5],
     bid: usize,
 }
@@ -91,10 +91,10 @@ impl FromStr for Hand {
             }
 
             let bid = bid_str.parse().map_err(|_| ParseHandError)?;
-            let hand_type = HandType::from_cards(cards);
+            let htype = HandType::from_cards(cards);
 
             Ok(Hand {
-                hand_type,
+                htype,
                 cards,
                 bid,
             })
@@ -157,27 +157,27 @@ mod tests {
         vec![
             Hand {
                 cards: [3, 2, 10, 3, 13],
-                hand_type: HandType::OnePair,
+                htype: HandType::OnePair,
                 bid: 765,
             },
             Hand {
                 cards: [10, 5, 5, 11, 5],
-                hand_type: HandType::ThreeOfAKind,
+                htype: HandType::ThreeOfAKind,
                 bid: 684,
             },
             Hand {
                 cards: [13, 13, 6, 7, 7],
-                hand_type: HandType::TwoPair,
+                htype: HandType::TwoPair,
                 bid: 28,
             },
             Hand {
                 cards: [13, 10, 11, 11, 10],
-                hand_type: HandType::TwoPair,
+                htype: HandType::TwoPair,
                 bid: 220,
             },
             Hand {
                 cards: [12, 12, 12, 11, 14],
-                hand_type: HandType::ThreeOfAKind,
+                htype: HandType::ThreeOfAKind,
                 bid: 483,
             },
         ]
@@ -189,7 +189,7 @@ mod tests {
             "32T3K 765".parse(),
             Ok(Hand {
                 cards: [3, 2, 10, 3, 13],
-                hand_type: HandType::OnePair,
+                htype: HandType::OnePair,
                 bid: 765,
             }),
         );
@@ -197,7 +197,7 @@ mod tests {
             "T55J5 684".parse(),
             Ok(Hand {
                 cards: [10, 5, 5, 11, 5],
-                hand_type: HandType::ThreeOfAKind,
+                htype: HandType::ThreeOfAKind,
                 bid: 684,
             }),
         );
@@ -205,7 +205,7 @@ mod tests {
             "KK677 28".parse(),
             Ok(Hand {
                 cards: [13, 13, 6, 7, 7],
-                hand_type: HandType::TwoPair,
+                htype: HandType::TwoPair,
                 bid: 28,
             }),
         )
@@ -228,27 +228,27 @@ mod tests {
             vec![
                 Hand {
                     cards: [3, 2, 10, 3, 13],
-                    hand_type: HandType::OnePair,
+                    htype: HandType::OnePair,
                     bid: 765
                 },
                 Hand {
                     cards: [13, 10, 11, 11, 10],
-                    hand_type: HandType::TwoPair,
+                    htype: HandType::TwoPair,
                     bid: 220
                 },
                 Hand {
                     cards: [13, 13, 6, 7, 7],
-                    hand_type: HandType::TwoPair,
+                    htype: HandType::TwoPair,
                     bid: 28
                 },
                 Hand {
                     cards: [10, 5, 5, 11, 5],
-                    hand_type: HandType::ThreeOfAKind,
+                    htype: HandType::ThreeOfAKind,
                     bid: 684
                 },
                 Hand {
                     cards: [12, 12, 12, 11, 14],
-                    hand_type: HandType::ThreeOfAKind,
+                    htype: HandType::ThreeOfAKind,
                     bid: 483
                 },
             ]
@@ -267,7 +267,7 @@ mod tests {
             "T55j5 684".parse(),
             Ok(Hand {
                 cards: [10, 5, 5, 0, 5],
-                hand_type: HandType::FourOfAKind,
+                htype: HandType::FourOfAKind,
                 bid: 684,
             }),
         );
@@ -275,7 +275,7 @@ mod tests {
             "KTjjT 220".parse(),
             Ok(Hand {
                 cards: [13, 10, 0, 0, 10],
-                hand_type: HandType::FourOfAKind,
+                htype: HandType::FourOfAKind,
                 bid: 220,
             }),
         );
@@ -283,7 +283,7 @@ mod tests {
             "234jj 137".parse(),
             Ok(Hand {
                 cards: [2, 3, 4, 0, 0],
-                hand_type: HandType::ThreeOfAKind,
+                htype: HandType::ThreeOfAKind,
                 bid: 137,
             }),
         );
@@ -291,7 +291,7 @@ mod tests {
             "2345j 9652".parse(),
             Ok(Hand {
                 cards: [2, 3, 4, 5, 0],
-                hand_type: HandType::OnePair,
+                htype: HandType::OnePair,
                 bid: 9652,
             }),
         )
@@ -304,27 +304,27 @@ mod tests {
             Ok(vec![
                 Hand {
                     cards: [3, 2, 10, 3, 13],
-                    hand_type: HandType::OnePair,
+                    htype: HandType::OnePair,
                     bid: 765,
                 },
                 Hand {
                     cards: [10, 5, 5, 0, 5],
-                    hand_type: HandType::FourOfAKind,
+                    htype: HandType::FourOfAKind,
                     bid: 684,
                 },
                 Hand {
                     cards: [13, 13, 6, 7, 7],
-                    hand_type: HandType::TwoPair,
+                    htype: HandType::TwoPair,
                     bid: 28,
                 },
                 Hand {
                     cards: [13, 10, 0, 0, 10],
-                    hand_type: HandType::FourOfAKind,
+                    htype: HandType::FourOfAKind,
                     bid: 220,
                 },
                 Hand {
                     cards: [12, 12, 12, 0, 14],
-                    hand_type: HandType::FourOfAKind,
+                    htype: HandType::FourOfAKind,
                     bid: 483,
                 },
             ]),
