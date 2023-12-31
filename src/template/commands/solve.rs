@@ -2,6 +2,10 @@ use std::process::{Command, Stdio};
 
 use crate::Day;
 
+/// # Panics
+///
+/// Will panic if the Cargo command spawned by this function fails to start or
+/// panics itself during execution.
 pub fn handle(day: Day, release: bool, time: bool, submit_part: Option<u8>) {
     let mut cmd_args = vec!["run".to_string(), "--bin".to_string(), day.to_string()];
 

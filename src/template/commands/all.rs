@@ -6,6 +6,10 @@ use crate::template::{
 };
 use crate::{all_days, Day};
 
+/// # Panics
+///
+///  Will panic if an error is returned by calling `.wait()` on the the cargo command
+/// spawned during `run_solution`.
 pub fn handle(is_release: bool, is_timed: bool) {
     let mut timings: Vec<Timings> = vec![];
 
