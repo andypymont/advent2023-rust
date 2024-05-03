@@ -121,10 +121,10 @@ struct TrailGraph {
 impl TrailGraph {
     fn longest_hike(&self) -> Option<u32> {
         let mut longest: Option<u32> = None;
-        let mut queue = VecDeque::new();
-        queue.push_back(HikeState::new(self.start));
+        let mut queue = Vec::new();
+        queue.push(HikeState::new(self.start));
 
-        while let Some(state) = queue.pop_back() {
+        while let Some(state) = queue.pop() {
             if state.position == self.finish {
                 longest = match longest {
                     Some(steps) => Some(steps.max(state.steps)),
@@ -137,7 +137,7 @@ impl TrailGraph {
                     };
 
                     if !state.visited.contains(position) {
-                        queue.push_back(state.visit(position, *steps));
+                        queue.push(state.visit(position, *steps));
                     }
                 }
             }
@@ -162,8 +162,8 @@ impl TrailMap {
                 _ => (start, finish),
             },
         );
-        let mut poi = BTreeSet::new();
-        poi.insert(start);
+        let mut poi = Vec::new();
+        poi.push(start);
         let mut connections = BTreeSet::new();
 
         let mut queue = VecDeque::new();
@@ -190,7 +190,7 @@ impl TrailMap {
                 connections.insert((state.source, state.position, state.steps));
                 if !poi.contains(&state.position) {
                     queue.push_back(GraphMappingState::new(state.position));
-                    poi.insert(state.position);
+                    poi.push(state.position);
                 }
             } else {
                 // not at a new point of interest: keep exploring this route
@@ -208,6 +208,7 @@ impl TrailMap {
             nodes: Vec::new(),
         };
         let mut poi_indices = BTreeMap::new();
+        poi.sort_unstable();
         for (ix, node) in poi.iter().enumerate() {
             poi_indices.insert(node, ix);
             let node = vec![None; poi.len()];
