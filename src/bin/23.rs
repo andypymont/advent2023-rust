@@ -1,12 +1,11 @@
-use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::str::FromStr;
 
 advent_of_code::solution!(23);
 
 const GRID_SIZE: usize = 141;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Direction {
     North,
     East,
@@ -75,22 +74,6 @@ struct HikeState {
     visited: BitSet,
 }
 
-impl Ord for HikeState {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match self.steps.cmp(&other.steps) {
-            Ordering::Less => Ordering::Less,
-            Ordering::Greater => Ordering::Greater,
-            Ordering::Equal => other.visited.0.cmp(&self.visited.0),
-        }
-    }
-}
-
-impl PartialOrd for HikeState {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
 impl HikeState {
     fn new(position: usize) -> Self {
         Self {
@@ -115,17 +98,15 @@ enum Trail {
     Start,
     Finish,
     Forest,
-    SlopeWE,
-    SlopeNS,
+    Slope(Direction),
 }
 
 impl Trail {
-    fn can_exit_in_direction(self, direction: &Direction, ignore_slopes: bool) -> bool {
+    fn can_exit_in_direction(self, direction: Direction, ignore_slopes: bool) -> bool {
         match self {
             Self::Empty | Self::Start => true,
             Self::Forest | Self::Finish => false,
-            Self::SlopeNS => ignore_slopes || direction == &Direction::South,
-            Self::SlopeWE => ignore_slopes || direction == &Direction::East,
+            Self::Slope(slope_dir) => ignore_slopes || direction == slope_dir,
         }
     }
 }
@@ -140,10 +121,10 @@ struct TrailGraph {
 impl TrailGraph {
     fn longest_hike(&self) -> Option<u32> {
         let mut longest: Option<u32> = None;
-        let mut queue = BinaryHeap::new();
-        queue.push(HikeState::new(self.start));
+        let mut queue = VecDeque::new();
+        queue.push_back(HikeState::new(self.start));
 
-        while let Some(state) = queue.pop() {
+        while let Some(state) = queue.pop_back() {
             if state.position == self.finish {
                 longest = match longest {
                     Some(steps) => Some(steps.max(state.steps)),
@@ -156,7 +137,7 @@ impl TrailGraph {
                     };
 
                     if !state.visited.contains(position) {
-                        queue.push(state.visit(position, *steps));
+                        queue.push_back(state.visit(position, *steps));
                     }
                 }
             }
@@ -193,10 +174,10 @@ impl TrailMap {
             let exits: Vec<usize> = COMPASS
                 .iter()
                 .filter_map(move |direction| {
-                    if !trail.can_exit_in_direction(direction, ignore_slopes) {
+                    if !trail.can_exit_in_direction(*direction, ignore_slopes) {
                         return None;
                     }
-                    Self::step_in_direction(state.position, direction)
+                    Self::step_in_direction(state.position, *direction)
                         .filter(|pos| self.trails[*pos] != Trail::Forest)
                 })
                 .collect();
@@ -253,7 +234,7 @@ impl TrailMap {
         graph
     }
 
-    fn step_in_direction(pos: usize, direction: &Direction) -> Option<usize> {
+    fn step_in_direction(pos: usize, direction: Direction) -> Option<usize> {
         let row = pos / GRID_SIZE;
         let col = pos % GRID_SIZE;
 
@@ -313,8 +294,8 @@ impl FromStr for TrailMap {
                         }
                     }
                     '#' => trails[pos] = Trail::Forest,
-                    '>' => trails[pos] = Trail::SlopeWE,
-                    'v' => trails[pos] = Trail::SlopeNS,
+                    '>' => trails[pos] = Trail::Slope(Direction::East),
+                    'v' => trails[pos] = Trail::Slope(Direction::South),
                     _ => return Err(ParseTrailError),
                 }
             }
@@ -495,28 +476,28 @@ mod tests {
             }
         }
         trails[position(0, 1)] = Trail::Start;
-        trails[position(3, 10)] = Trail::SlopeWE;
-        trails[position(3, 12)] = Trail::SlopeWE;
-        trails[position(4, 3)] = Trail::SlopeNS;
-        trails[position(4, 11)] = Trail::SlopeNS;
-        trails[position(5, 4)] = Trail::SlopeWE;
-        trails[position(6, 3)] = Trail::SlopeNS;
-        trails[position(10, 21)] = Trail::SlopeNS;
-        trails[position(11, 20)] = Trail::SlopeWE;
-        trails[position(12, 5)] = Trail::SlopeNS;
-        trails[position(12, 13)] = Trail::SlopeNS;
-        trails[position(12, 21)] = Trail::SlopeNS;
-        trails[position(13, 6)] = Trail::SlopeWE;
-        trails[position(13, 12)] = Trail::SlopeWE;
-        trails[position(13, 14)] = Trail::SlopeWE;
-        trails[position(14, 5)] = Trail::SlopeNS;
-        trails[position(14, 13)] = Trail::SlopeNS;
-        trails[position(18, 13)] = Trail::SlopeNS;
-        trails[position(18, 19)] = Trail::SlopeNS;
-        trails[position(19, 12)] = Trail::SlopeWE;
-        trails[position(19, 14)] = Trail::SlopeWE;
-        trails[position(19, 18)] = Trail::SlopeWE;
-        trails[position(20, 19)] = Trail::SlopeNS;
+        trails[position(3, 10)] = Trail::Slope(Direction::East);
+        trails[position(3, 12)] = Trail::Slope(Direction::East);
+        trails[position(4, 3)] = Trail::Slope(Direction::South);
+        trails[position(4, 11)] = Trail::Slope(Direction::South);
+        trails[position(5, 4)] = Trail::Slope(Direction::East);
+        trails[position(6, 3)] = Trail::Slope(Direction::South);
+        trails[position(10, 21)] = Trail::Slope(Direction::South);
+        trails[position(11, 20)] = Trail::Slope(Direction::East);
+        trails[position(12, 5)] = Trail::Slope(Direction::South);
+        trails[position(12, 13)] = Trail::Slope(Direction::South);
+        trails[position(12, 21)] = Trail::Slope(Direction::South);
+        trails[position(13, 6)] = Trail::Slope(Direction::East);
+        trails[position(13, 12)] = Trail::Slope(Direction::East);
+        trails[position(13, 14)] = Trail::Slope(Direction::East);
+        trails[position(14, 5)] = Trail::Slope(Direction::South);
+        trails[position(14, 13)] = Trail::Slope(Direction::South);
+        trails[position(18, 13)] = Trail::Slope(Direction::South);
+        trails[position(18, 19)] = Trail::Slope(Direction::South);
+        trails[position(19, 12)] = Trail::Slope(Direction::East);
+        trails[position(19, 14)] = Trail::Slope(Direction::East);
+        trails[position(19, 18)] = Trail::Slope(Direction::East);
+        trails[position(20, 19)] = Trail::Slope(Direction::South);
         trails[position(22, 21)] = Trail::Finish;
 
         TrailMap { trails }
