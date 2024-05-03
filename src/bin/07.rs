@@ -93,11 +93,7 @@ impl FromStr for Hand {
             let bid = bid_str.parse().map_err(|_| ParseHandError)?;
             let htype = HandType::from_cards(cards);
 
-            Ok(Hand {
-                htype,
-                cards,
-                bid,
-            })
+            Ok(Hand { htype, cards, bid })
         } else {
             Err(ParseHandError)
         }

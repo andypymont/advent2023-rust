@@ -93,7 +93,7 @@ impl FromStr for Network {
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         let Some((directions_str, graph_str)) = input.split_once("\n\n") else {
-            return Err(ParseNetworkError)
+            return Err(ParseNetworkError);
         };
 
         let mut directions = Vec::new();

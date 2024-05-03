@@ -87,10 +87,10 @@ impl FromStr for Pattern {
 fn total_mirror_value(input: &str, smudge: bool) -> Option<usize> {
     let (errors, total) = input.split("\n\n").fold((0, 0), |(errors, total), line| {
         let Ok(pattern) = Pattern::from_str(line) else {
-            return (errors + 1, total)
+            return (errors + 1, total);
         };
         let Some(mirror) = pattern.find_mirrors(smudge).next() else {
-            return (errors + 1, total)
+            return (errors + 1, total);
         };
         (errors, total + mirror.value())
     });

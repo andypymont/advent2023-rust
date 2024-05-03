@@ -177,7 +177,7 @@ fn read_instructions(
 #[must_use]
 pub fn part_one(input: &str) -> Option<u64> {
     let Ok(instructions) = read_instructions(input, false) else {
-        return None
+        return None;
     };
     if let Ok(polygon) = Polygon::from_instructions(&instructions) {
         Some(polygon.area_including_circumference())
@@ -189,7 +189,7 @@ pub fn part_one(input: &str) -> Option<u64> {
 #[must_use]
 pub fn part_two(input: &str) -> Option<u64> {
     let Ok(instructions) = read_instructions(input, true) else {
-        return None
+        return None;
     };
     if let Ok(polygon) = Polygon::from_instructions(&instructions) {
         Some(polygon.area_including_circumference())
