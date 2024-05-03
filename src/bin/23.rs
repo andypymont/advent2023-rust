@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BinaryHeap, BTreeMap, BTreeSet, VecDeque};
 use std::str::FromStr;
 
 advent_of_code::solution!(23);
@@ -52,31 +52,54 @@ impl GraphMappingState {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+struct BitSet(usize);
+
+impl BitSet {
+    fn contains(self, pos: usize) -> bool {
+        let flag = 1 << pos;
+        self.0 & flag != 0
+    }
+
+    fn insert(self, pos: usize) -> Self {
+        let flag = 1 << pos;
+        Self(self.0 | flag)
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
 struct HikeState {
     position: usize,
     steps: u32,
-    visited: [bool; GRID_SIZE * GRID_SIZE],
+    visited: BitSet,
+}
+
+impl Ord for HikeState {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.steps.cmp(&other.steps)        
+    }
+}
+
+impl PartialOrd for HikeState {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl HikeState {
     fn new(position: usize) -> Self {
-        let mut visited = [false; GRID_SIZE * GRID_SIZE];
-        visited[position] = true;
         Self {
             position,
             steps: 0,
-            visited,
+            visited: BitSet(0).insert(position),
         }
     }
 
     fn visit(&self, position: usize, steps: u32) -> Self {
-        let mut visited = self.visited;
-        visited[position] = true;
         Self {
             position,
             steps: self.steps + steps,
-            visited,
+            visited: self.visited.insert(position),
         }
     }
 }
@@ -92,21 +115,22 @@ enum Trail {
 }
 
 impl Trail {
-    fn can_exit_in_direction(self, direction: &Direction) -> bool {
+    fn can_exit_in_direction(self, direction: &Direction, ignore_slopes: bool) -> bool {
         match self {
             Self::Empty | Self::Start => true,
             Self::Forest | Self::Finish => false,
-            Self::SlopeNS => direction == &Direction::South,
-            Self::SlopeWE => direction == &Direction::East,
+            Self::SlopeNS => ignore_slopes || direction == &Direction::South,
+            Self::SlopeWE => ignore_slopes || direction == &Direction::East,
         }
     }
 }
 
 #[derive(Debug, PartialEq)]
 struct TrailGraph {
+    poi: Vec<usize>,
     start: usize,
     finish: usize,
-    nodes: HashMap<usize, HashMap<usize, u32>>,
+    nodes: BTreeMap<usize, BTreeMap<usize, u32>>,
 }
 
 impl TrailGraph {
@@ -118,23 +142,42 @@ impl TrailGraph {
     }
 
     fn longest_hike(&self) -> Option<u32> {
-        let mut hikes = Vec::new();
-        let mut queue = VecDeque::new();
-        queue.push_back(HikeState::new(self.start));
+        let mut longest: Option<u32> = None;
+        let mut queue = BinaryHeap::new();
+        let mut bests = BTreeMap::new();
+        queue.push(HikeState::new(self.start));
 
-        while let Some(state) = queue.pop_front() {
+        while let Some(state) = queue.pop() {
             if state.position == self.finish {
-                hikes.push(state.steps);
+                longest = match longest {
+                    Some(steps) => Some(steps.max(state.steps)),
+                    None => Some(state.steps),
+                }
             } else if let Some(node) = self.nodes.get(&state.position) {
+                if let Some(best) = bests.get(&(state.position, state.visited)) {
+                    if state.steps <= *best {
+                        continue;
+                    }
+                }
+
+                bests.insert((state.position, state.visited), state.steps);
                 for (position, steps) in node {
-                    if !state.visited[*position] {
-                        queue.push_back(state.visit(*position, *steps));
+                    if !state.visited.contains(*position) {
+                        queue.push(state.visit(*position, *steps));
                     }
                 }
             }
         }
 
-        hikes.into_iter().max()
+        longest
+    }
+
+    fn poi_indices(&self) -> BTreeMap<usize, usize> {
+        let mut indices = BTreeMap::new();
+        for (ix, position) in self.poi.iter().enumerate() {
+            indices.insert(*position, ix);
+        }
+        indices
     }
 }
 
@@ -144,7 +187,7 @@ struct TrailMap {
 }
 
 impl TrailMap {
-    fn graph(&self) -> TrailGraph {
+    fn graph(&self, ignore_slopes: bool) -> TrailGraph {
         let (start, finish) = self.trails.iter().enumerate().fold(
             (0, 0),
             |(start, finish), (pos, trail)| match trail {
@@ -153,23 +196,19 @@ impl TrailMap {
                 _ => (start, finish),
             },
         );
-        let mut graph = TrailGraph {
-            start,
-            finish,
-            nodes: HashMap::new(),
-        };
+        let mut poi = BTreeSet::new();
+        poi.insert(start);
+        let mut connections = BTreeSet::new();
 
-        let mut queued = [false; GRID_SIZE * GRID_SIZE];
         let mut queue = VecDeque::new();
         queue.push_back(GraphMappingState::new(start));
-        queued[start] = true;
 
         while let Some(state) = queue.pop_front() {
             let trail = self.trails[state.position];
             let exits: Vec<usize> = COMPASS
                 .iter()
                 .filter_map(move |direction| {
-                    if !trail.can_exit_in_direction(direction) {
+                    if !trail.can_exit_in_direction(direction, ignore_slopes) {
                         return None;
                     }
                     Self::step_in_direction(state.position, direction)
@@ -182,10 +221,10 @@ impl TrailMap {
             {
                 // new point of interest found; record route, then initiate a new
                 // search from this POI if we haven't already
-                graph.add_connection(state.source, state.position, state.steps);
-                if !queued[state.position] {
+                connections.insert((state.source, state.position, state.steps));
+                if !poi.contains(&state.position) {
                     queue.push_back(GraphMappingState::new(state.position));
-                    queued[state.position] = true;
+                    poi.insert(state.position);
                 }
             } else {
                 // not at a new point of interest: keep exploring this route
@@ -195,6 +234,30 @@ impl TrailMap {
                     }
                 }
             }
+        }
+
+        let mut graph = TrailGraph {
+            poi: poi.into_iter().collect(),
+            start: 0,
+            finish: 0,
+            nodes: BTreeMap::new(),
+        };
+        let poi_indices = graph.poi_indices();
+        if let Some(start) = poi_indices.get(&start) {
+            graph.start = *start;
+        }
+        if let Some(finish) = poi_indices.get(&finish) {
+            graph.finish = *finish;
+        }
+
+        for (origin, destination, steps) in connections {
+            let Some(origin) = poi_indices.get(&origin) else {
+                continue;
+            };
+            let Some(destination) = poi_indices.get(&destination) else {
+                continue;
+            };
+            graph.add_connection(*origin, *destination, steps);
         }
 
         graph
@@ -279,7 +342,7 @@ impl FromStr for TrailMap {
 #[must_use]
 pub fn part_one(input: &str) -> Option<u32> {
     if let Ok(trail_map) = TrailMap::from_str(input) {
-        let graph = trail_map.graph();
+        let graph = trail_map.graph(false);
         graph.longest_hike()
     } else {
         None
@@ -287,8 +350,13 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 #[must_use]
-pub fn part_two(__input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u32> {
+    if let Ok(trail_map) = TrailMap::from_str(input) {
+        let graph = trail_map.graph(true);
+        graph.longest_hike()
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -466,23 +534,50 @@ mod tests {
 
     fn example_trail_graph() -> TrailGraph {
         let mut graph = TrailGraph {
-            start: position(0, 1),
-            finish: position(22, 21),
-            nodes: HashMap::new(),
+            poi: vec![
+                position(0, 1),
+                position(3, 11),
+                position(5, 3),
+                position(11, 21),
+                position(13, 5),
+                position(13, 13),
+                position(19, 13),
+                position(19, 19),
+                position(22, 21),
+            ],
+            start: 0,
+            finish: 8,
+            nodes: BTreeMap::new(),
         };
-        graph.add_connection(position(0, 1), position(5, 3), 15);
-        graph.add_connection(position(5, 3), position(3, 11), 22);
-        graph.add_connection(position(5, 3), position(13, 5), 22);
-        graph.add_connection(position(3, 11), position(13, 13), 24);
-        graph.add_connection(position(3, 11), position(11, 21), 30);
-        graph.add_connection(position(11, 21), position(19, 19), 10);
-        graph.add_connection(position(13, 5), position(13, 13), 12);
-        graph.add_connection(position(13, 5), position(19, 13), 38);
-        graph.add_connection(position(13, 13), position(11, 21), 18);
-        graph.add_connection(position(13, 13), position(19, 13), 10);
-        graph.add_connection(position(19, 13), position(19, 19), 10);
-        graph.add_connection(position(19, 19), position(22, 21), 5);
+
+        graph.add_connection(0, 2, 15);
+        graph.add_connection(1, 3, 30);
+        graph.add_connection(1, 5, 24);
+        graph.add_connection(2, 1, 22);
+        graph.add_connection(2, 4, 22);
+        graph.add_connection(3, 7, 10);
+        graph.add_connection(4, 5, 12);
+        graph.add_connection(4, 6, 38);
+        graph.add_connection(5, 3, 18);
+        graph.add_connection(5, 6, 10);
+        graph.add_connection(6, 7, 10);
+        graph.add_connection(7, 8, 5);
+
         graph
+    }
+
+    #[test]
+    fn test_bit_set() {
+        let bs = BitSet(11);
+
+        assert_eq!(bs.contains(0), true);
+        assert_eq!(bs.contains(1), true);
+        assert_eq!(bs.contains(2), false);
+        assert_eq!(bs.contains(3), true);
+        assert_eq!(bs.contains(4), false);
+
+        assert_eq!(bs.insert(2), BitSet(15));
+        assert_eq!(bs.insert(4), BitSet(27));
     }
 
     #[test]
@@ -496,7 +591,7 @@ mod tests {
     #[test]
     fn test_trail_map_graph() {
         let trail_map = example_trail_map();
-        assert_eq!(trail_map.graph(), example_trail_graph(),);
+        assert_eq!(trail_map.graph(false), example_trail_graph());
     }
 
     #[test]
@@ -505,9 +600,58 @@ mod tests {
         assert_eq!(result, Some(94));
     }
 
+    fn example_trail_graph_ignoring_slopes() -> TrailGraph {
+        let mut graph = TrailGraph {
+            poi: vec![
+                position(0, 1),
+                position(3, 11),
+                position(5, 3),
+                position(11, 21),
+                position(13, 5),
+                position(13, 13),
+                position(19, 13),
+                position(19, 19),
+                position(22, 21),
+            ],
+            start: 0,
+            finish: 8,
+            nodes: BTreeMap::new(),
+        };
+        graph.add_connection(0, 2, 15);
+        graph.add_connection(1, 2, 22);
+        graph.add_connection(1, 5, 24);
+        graph.add_connection(1, 3, 30);
+        graph.add_connection(2, 0, 15);
+        graph.add_connection(2, 1, 22);
+        graph.add_connection(2, 4, 22);
+        graph.add_connection(3, 1, 30);
+        graph.add_connection(3, 5, 18);
+        graph.add_connection(3, 7, 10);
+        graph.add_connection(4, 2, 22);
+        graph.add_connection(4, 5, 12);
+        graph.add_connection(4, 6, 38);
+        graph.add_connection(5, 1, 24);
+        graph.add_connection(5, 4, 12);
+        graph.add_connection(5, 3, 18);
+        graph.add_connection(5, 6, 10);
+        graph.add_connection(6, 4, 38);
+        graph.add_connection(6, 5, 10);
+        graph.add_connection(6, 7, 10);
+        graph.add_connection(7, 3, 10);
+        graph.add_connection(7, 6, 10);
+        graph.add_connection(7, 8, 5);
+        graph
+    }
+
+    #[test]
+    fn test_trail_map_graph_ignoring_slopes() {
+        let trail_map = example_trail_map();
+        assert_eq!(trail_map.graph(true), example_trail_graph_ignoring_slopes());
+    }
+    
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(154));
     }
 }
