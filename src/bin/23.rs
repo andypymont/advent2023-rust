@@ -1,4 +1,5 @@
-use std::collections::{BinaryHeap, BTreeMap, BTreeSet, VecDeque};
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
 use std::str::FromStr;
 
 advent_of_code::solution!(23);
@@ -76,7 +77,11 @@ struct HikeState {
 
 impl Ord for HikeState {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.steps.cmp(&other.steps)        
+        match self.steps.cmp(&other.steps) {
+            Ordering::Less => Ordering::Less,
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Equal => other.visited.0.cmp(&self.visited.0),
+        }
     }
 }
 
@@ -127,24 +132,15 @@ impl Trail {
 
 #[derive(Debug, PartialEq)]
 struct TrailGraph {
-    poi: Vec<usize>,
     start: usize,
     finish: usize,
-    nodes: BTreeMap<usize, BTreeMap<usize, u32>>,
+    nodes: Vec<Vec<Option<u32>>>,
 }
 
 impl TrailGraph {
-    fn add_connection(&mut self, source: usize, destination: usize, distance: u32) {
-        self.nodes
-            .entry(source)
-            .or_default()
-            .insert(destination, distance);
-    }
-
     fn longest_hike(&self) -> Option<u32> {
         let mut longest: Option<u32> = None;
         let mut queue = BinaryHeap::new();
-        let mut bests = BTreeMap::new();
         queue.push(HikeState::new(self.start));
 
         while let Some(state) = queue.pop() {
@@ -153,31 +149,20 @@ impl TrailGraph {
                     Some(steps) => Some(steps.max(state.steps)),
                     None => Some(state.steps),
                 }
-            } else if let Some(node) = self.nodes.get(&state.position) {
-                if let Some(best) = bests.get(&(state.position, state.visited)) {
-                    if state.steps <= *best {
+            } else if let Some(node) = self.nodes.get(state.position) {
+                for (position, steps) in node.iter().enumerate() {
+                    let Some(steps) = steps else {
                         continue;
-                    }
-                }
+                    };
 
-                bests.insert((state.position, state.visited), state.steps);
-                for (position, steps) in node {
-                    if !state.visited.contains(*position) {
-                        queue.push(state.visit(*position, *steps));
+                    if !state.visited.contains(position) {
+                        queue.push(state.visit(position, *steps));
                     }
                 }
             }
         }
 
         longest
-    }
-
-    fn poi_indices(&self) -> BTreeMap<usize, usize> {
-        let mut indices = BTreeMap::new();
-        for (ix, position) in self.poi.iter().enumerate() {
-            indices.insert(*position, ix);
-        }
-        indices
     }
 }
 
@@ -237,12 +222,17 @@ impl TrailMap {
         }
 
         let mut graph = TrailGraph {
-            poi: poi.into_iter().collect(),
             start: 0,
             finish: 0,
-            nodes: BTreeMap::new(),
+            nodes: Vec::new(),
         };
-        let poi_indices = graph.poi_indices();
+        let mut poi_indices = BTreeMap::new();
+        for (ix, node) in poi.iter().enumerate() {
+            poi_indices.insert(node, ix);
+            let node = vec![None; poi.len()];
+            graph.nodes.push(node);
+        }
+
         if let Some(start) = poi_indices.get(&start) {
             graph.start = *start;
         }
@@ -257,7 +247,7 @@ impl TrailMap {
             let Some(destination) = poi_indices.get(&destination) else {
                 continue;
             };
-            graph.add_connection(*origin, *destination, steps);
+            graph.nodes[*origin][*destination] = Some(steps);
         }
 
         graph
@@ -533,37 +523,21 @@ mod tests {
     }
 
     fn example_trail_graph() -> TrailGraph {
-        let mut graph = TrailGraph {
-            poi: vec![
-                position(0, 1),
-                position(3, 11),
-                position(5, 3),
-                position(11, 21),
-                position(13, 5),
-                position(13, 13),
-                position(19, 13),
-                position(19, 19),
-                position(22, 21),
-            ],
+        TrailGraph {
             start: 0,
             finish: 8,
-            nodes: BTreeMap::new(),
-        };
-
-        graph.add_connection(0, 2, 15);
-        graph.add_connection(1, 3, 30);
-        graph.add_connection(1, 5, 24);
-        graph.add_connection(2, 1, 22);
-        graph.add_connection(2, 4, 22);
-        graph.add_connection(3, 7, 10);
-        graph.add_connection(4, 5, 12);
-        graph.add_connection(4, 6, 38);
-        graph.add_connection(5, 3, 18);
-        graph.add_connection(5, 6, 10);
-        graph.add_connection(6, 7, 10);
-        graph.add_connection(7, 8, 5);
-
-        graph
+            nodes: vec![
+                vec![None, None, Some(15), None, None, None, None, None, None],
+                vec![None, None, None, Some(30), None, Some(24), None, None, None],
+                vec![None, Some(22), None, None, Some(22), None, None, None, None],
+                vec![None, None, None, None, None, None, None, Some(10), None],
+                vec![None, None, None, None, None, Some(12), Some(38), None, None],
+                vec![None, None, None, Some(18), None, None, Some(10), None, None],
+                vec![None, None, None, None, None, None, None, Some(10), None],
+                vec![None, None, None, None, None, None, None, None, Some(5)],
+                vec![None, None, None, None, None, None, None, None, None],
+            ],
+        }
     }
 
     #[test]
@@ -601,46 +575,91 @@ mod tests {
     }
 
     fn example_trail_graph_ignoring_slopes() -> TrailGraph {
-        let mut graph = TrailGraph {
-            poi: vec![
-                position(0, 1),
-                position(3, 11),
-                position(5, 3),
-                position(11, 21),
-                position(13, 5),
-                position(13, 13),
-                position(19, 13),
-                position(19, 19),
-                position(22, 21),
-            ],
+        TrailGraph {
             start: 0,
             finish: 8,
-            nodes: BTreeMap::new(),
-        };
-        graph.add_connection(0, 2, 15);
-        graph.add_connection(1, 2, 22);
-        graph.add_connection(1, 5, 24);
-        graph.add_connection(1, 3, 30);
-        graph.add_connection(2, 0, 15);
-        graph.add_connection(2, 1, 22);
-        graph.add_connection(2, 4, 22);
-        graph.add_connection(3, 1, 30);
-        graph.add_connection(3, 5, 18);
-        graph.add_connection(3, 7, 10);
-        graph.add_connection(4, 2, 22);
-        graph.add_connection(4, 5, 12);
-        graph.add_connection(4, 6, 38);
-        graph.add_connection(5, 1, 24);
-        graph.add_connection(5, 4, 12);
-        graph.add_connection(5, 3, 18);
-        graph.add_connection(5, 6, 10);
-        graph.add_connection(6, 4, 38);
-        graph.add_connection(6, 5, 10);
-        graph.add_connection(6, 7, 10);
-        graph.add_connection(7, 3, 10);
-        graph.add_connection(7, 6, 10);
-        graph.add_connection(7, 8, 5);
-        graph
+            nodes: vec![
+                vec![None, None, Some(15), None, None, None, None, None, None],
+                vec![
+                    None,
+                    None,
+                    Some(22),
+                    Some(30),
+                    None,
+                    Some(24),
+                    None,
+                    None,
+                    None,
+                ],
+                vec![
+                    Some(15),
+                    Some(22),
+                    None,
+                    None,
+                    Some(22),
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
+                vec![
+                    None,
+                    Some(30),
+                    None,
+                    None,
+                    None,
+                    Some(18),
+                    None,
+                    Some(10),
+                    None,
+                ],
+                vec![
+                    None,
+                    None,
+                    Some(22),
+                    None,
+                    None,
+                    Some(12),
+                    Some(38),
+                    None,
+                    None,
+                ],
+                vec![
+                    None,
+                    Some(24),
+                    None,
+                    Some(18),
+                    Some(12),
+                    None,
+                    Some(10),
+                    None,
+                    None,
+                ],
+                vec![
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(38),
+                    Some(10),
+                    None,
+                    Some(10),
+                    None,
+                ],
+                vec![
+                    None,
+                    None,
+                    None,
+                    Some(10),
+                    None,
+                    None,
+                    Some(10),
+                    None,
+                    Some(5),
+                ],
+                vec![None, None, None, None, None, None, None, None, None],
+            ],
+        }
     }
 
     #[test]
@@ -648,7 +667,7 @@ mod tests {
         let trail_map = example_trail_map();
         assert_eq!(trail_map.graph(true), example_trail_graph_ignoring_slopes());
     }
-    
+
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
