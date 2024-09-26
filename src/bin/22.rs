@@ -92,18 +92,47 @@ struct SupportGraph {
 }
 
 impl SupportGraph {
-    fn removable_bricks(&self) -> u32 {
+    fn removable_bricks(&self) -> usize {
         // a brick is removable if all the bricks it supports have multiple supporters
         self.supporting
             .iter()
             .map(|supporting| {
-                u32::from(
+                usize::from(
                     supporting
                         .iter()
                         .all(|supported| self.supporters[*supported].len() > 1),
                 )
             })
             .sum()
+    }
+
+    fn remove_brick(&self, ix: usize) -> usize {
+        let mut removed = BTreeSet::new();
+        let mut queue = Vec::new();
+        queue.push(ix);
+
+        while let Some(remove) = queue.pop() {
+            if removed.contains(&remove) {
+                continue;
+            }
+
+            // record removal of the brick
+            removed.insert(remove);
+
+            // iterate bricks supported by the one removed, find those with no remaining
+            // supporters, and mark them for removal
+            for brick in &self.supporting[remove] {
+                if self.supporters[*brick]
+                    .difference(&removed)
+                    .next()
+                    .is_none()
+                {
+                    queue.push(*brick);
+                }
+            }
+        }
+
+        removed.len().saturating_sub(1)
     }
 }
 
@@ -164,7 +193,7 @@ impl From<Vec<Vec<usize>>> for SupportGraph {
 }
 
 #[must_use]
-pub fn part_one(input: &str) -> Option<u32> {
+pub fn part_one(input: &str) -> Option<usize> {
     let bricks = read_bricks(input);
     if bricks.is_empty() {
         None
@@ -175,8 +204,18 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<usize> {
+    let bricks = read_bricks(input);
+    if bricks.is_empty() {
+        None
+    } else {
+        let graph = SupportGraph::from(bricks);
+        Some(
+            (0..graph.supporters.len())
+                .map(|ix| graph.remove_brick(ix))
+                .sum(),
+        )
+    }
 }
 
 #[cfg(test)]
@@ -286,8 +325,17 @@ mod tests {
     }
 
     #[test]
+    fn test_remove_brick() {
+        let graph = example_graph();
+        assert_eq!(graph.remove_brick(0), 6);
+        assert_eq!(graph.remove_brick(1), 0);
+        assert_eq!(graph.remove_brick(3), 0);
+        assert_eq!(graph.remove_brick(5), 1);
+    }
+
+    #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(7));
     }
 }
