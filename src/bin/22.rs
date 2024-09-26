@@ -1,189 +1,176 @@
-use std::collections::{BTreeMap, BTreeSet};
-use std::str::FromStr;
+use std::cmp::Ordering;
+use std::collections::BTreeSet;
 
 advent_of_code::solution!(22);
 
-#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-struct Cube {
-    x: u32,
-    y: u32,
-    z: u32,
+const GRID_SIZE: usize = 10;
+const GRID_HEIGHT: usize = 310;
+
+fn cube(x: usize, y: usize, z: usize) -> usize {
+    (z * GRID_SIZE * GRID_SIZE) + (y * GRID_SIZE) + x
 }
 
-#[derive(Debug, PartialEq)]
-struct ParseBrickError;
+fn read_cube(text: &str) -> Option<(usize, usize, usize)> {
+    let mut x: Option<usize> = None;
+    let mut y: Option<usize> = None;
+    let mut z: Option<usize> = None;
 
-impl FromStr for Cube {
-    type Err = ParseBrickError;
-
-    fn from_str(text: &str) -> Result<Self, Self::Err> {
-        let mut x: Result<u32, Self::Err> = Err(ParseBrickError);
-        let mut y: Result<u32, Self::Err> = Err(ParseBrickError);
-        let mut z: Result<u32, Self::Err> = Err(ParseBrickError);
-
-        for (pos, part) in text.split(',').enumerate() {
-            let value = part.parse().map_err(|_| ParseBrickError);
-            match pos {
-                0 => x = value,
-                1 => y = value,
-                2 => z = value,
-                _ => return Err(ParseBrickError),
-            }
-        }
-
-        let x = x?;
-        let y = y?;
-        let z = z?;
-        Ok(Self { x, y, z })
-    }
-}
-
-#[derive(Debug, PartialEq)]
-struct Brick {
-    cubes: Vec<Cube>,
-    min_z: u32,
-}
-
-impl Brick {
-    fn fall(&self) -> Self {
-        Self {
-            cubes: self
-                .cubes
-                .iter()
-                .map(|cube| Cube {
-                    x: cube.x,
-                    y: cube.y,
-                    z: cube.z - 1,
-                })
-                .collect(),
-            min_z: self.min_z.saturating_sub(1),
-        }
-    }
-}
-
-impl FromStr for Brick {
-    type Err = ParseBrickError;
-
-    fn from_str(line: &str) -> Result<Self, Self::Err> {
-        let Some((first, last)) = line.split_once('~') else {
-            return Err(ParseBrickError);
+    for (ix, part) in text.split(',').enumerate() {
+        let value = match part.parse() {
+            Ok(v) => Some(v),
+            Err(_) => None,
         };
-        let mut cube: Cube = first.parse()?;
-        let last: Cube = last.parse()?;
-
-        let mut cubes = Vec::new();
-        let mut min_z = cube.z;
-        while cube != last {
-            min_z = min_z.min(cube.z);
-            cubes.push(cube);
-            let x = cube.x + u32::from(cube.x < last.x);
-            let y = cube.y + u32::from(cube.y < last.y);
-            let z = cube.z + u32::from(cube.z < last.z);
-            cube = Cube { x, y, z };
+        match ix {
+            0 => x = value,
+            1 => y = value,
+            2 => z = value,
+            _ => return None,
         }
-        cubes.push(cube);
-
-        Ok(Self { cubes, min_z })
     }
+
+    let x = x?;
+    let y = y?;
+    let z = z?;
+    Some((x, y, z))
 }
 
-#[derive(Debug, PartialEq)]
-struct System {
-    bricks: Vec<Brick>,
-    occupied: BTreeMap<Cube, usize>,
+fn read_brick(line: &str) -> Option<Vec<usize>> {
+    let Some((first, last)) = line.split_once('~') else {
+        return None;
+    };
+
+    let Some((mut x, mut y, mut z)) = read_cube(first) else {
+        return None;
+    };
+
+    let Some((last_x, last_y, last_z)) = read_cube(last) else {
+        return None;
+    };
+
+    if (x > last_x) || (y > last_y) || (z > last_z) {
+        return None;
+    }
+
+    let mut brick = Vec::new();
+
+    while (x, y, z) != (last_x, last_y, last_z) {
+        brick.push(cube(x, y, z));
+        x += usize::from(x < last_x);
+        y += usize::from(y < last_y);
+        z += usize::from(z < last_z);
+    }
+    brick.push(cube(x, y, z));
+
+    Some(brick)
 }
 
-impl System {
-    fn fall(&mut self) -> usize {
-        let mut drop_count = 0;
+fn read_bricks(input: &str) -> Vec<Vec<usize>> {
+    let mut bricks = Vec::new();
 
-        for ix in 0..self.bricks.len() {
-            let brick = &self.bricks[ix];
-            if brick.min_z > 1 {
-                let dropped = brick.fall();
-                if dropped
-                    .cubes
-                    .iter()
-                    .all(|cube| match self.occupied.get(cube) {
-                        None => true,
-                        Some(supporter) => supporter == &ix,
-                    })
-                {
-                    drop_count += 1;
-                    for cube in &brick.cubes {
-                        self.occupied.remove(cube);
-                    }
-                    for cube in &dropped.cubes {
-                        self.occupied.insert(*cube, ix);
-                    }
-                    self.bricks[ix] = dropped;
-                }
-            }
-        }
-
-        drop_count
-    }
-
-    fn settle(&mut self) {
-        while self.fall() > 0 {
-            // keep looping whilst bricks keep dropping
-        }
-    }
-
-    fn unremovable_brick_indices(&self) -> BTreeSet<usize> {
-        let mut unremovable = BTreeSet::new();
-
-        for (ix, brick) in self.bricks.iter().enumerate() {
-            let dropped = brick.fall();
-            let mut supporters = BTreeSet::new();
-            for cube in &dropped.cubes {
-                if let Some(supporter) = self.occupied.get(cube) {
-                    if supporter != &ix {
-                        supporters.insert(supporter);
-                    }
-                }
-            }
-            if supporters.len() == 1 {
-                // exactly one brick supports this one
-                if let Some(supporter) = supporters.iter().next() {
-                    unremovable.insert(**supporter);
-                }
-            }
-        }
-
-        unremovable
-    }
-}
-
-impl FromStr for System {
-    type Err = ParseBrickError;
-
-    fn from_str(text: &str) -> Result<Self, Self::Err> {
-        let mut bricks = Vec::new();
-        let mut occupied = BTreeMap::new();
-        for (ix, line) in text.lines().enumerate() {
-            let brick: Brick = line.parse()?;
-            for cube in &brick.cubes {
-                occupied.insert(*cube, ix);
-            }
+    for line in input.lines() {
+        if let Some(brick) = read_brick(line) {
             bricks.push(brick);
         }
-        Ok(Self { bricks, occupied })
+    }
+
+    bricks.sort_unstable_by(
+        |a: &Vec<usize>, b: &Vec<usize>| match (a.first(), b.first()) {
+            (None, None) => Ordering::Equal,
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            (Some(a), Some(b)) => a.cmp(b),
+        },
+    );
+
+    bricks
+}
+
+#[derive(Debug, PartialEq)]
+struct SupportGraph {
+    supporters: Vec<BTreeSet<usize>>,
+    supporting: Vec<BTreeSet<usize>>,
+}
+
+impl SupportGraph {
+    fn removable_bricks(&self) -> u32 {
+        // a brick is removable if all the bricks it supports have multiple supporters
+        self.supporting
+            .iter()
+            .map(|supporting| {
+                u32::from(
+                    supporting
+                        .iter()
+                        .all(|supported| self.supporters[*supported].len() > 1),
+                )
+            })
+            .sum()
+    }
+}
+
+impl From<Vec<Vec<usize>>> for SupportGraph {
+    fn from(bricks: Vec<Vec<usize>>) -> Self {
+        let mut occupied: Vec<Option<usize>> = vec![None; GRID_HEIGHT * GRID_SIZE * GRID_SIZE];
+
+        let mut supporters = Vec::new();
+        let mut supporting = Vec::new();
+
+        for (brick_ix, mut brick) in bricks.into_iter().enumerate() {
+            let mut supported_by = BTreeSet::new();
+
+            // Lower the brick as much as possible
+            loop {
+                let beneath: Vec<usize> = brick
+                    .iter()
+                    .filter_map(|cube| cube.checked_sub(GRID_SIZE * GRID_SIZE))
+                    .collect();
+                if beneath.len() < brick.len() {
+                    break;
+                }
+
+                supported_by.clear();
+                for pos in &beneath {
+                    if let Some(other_brick) = occupied[*pos] {
+                        supported_by.insert(other_brick);
+                    }
+                }
+                if !supported_by.is_empty() {
+                    break;
+                }
+                brick = beneath;
+            }
+
+            // Record cube positions occupied by this brick
+            for cube in brick {
+                occupied[cube] = Some(brick_ix);
+            }
+
+            // Record supporters and create an empty supporting entry for later population
+            supporters.push(supported_by);
+            supporting.push(BTreeSet::new());
+        }
+
+        // Calculate supporting graph
+        for (brick_ix, others) in supporters.iter().enumerate() {
+            for other in others {
+                supporting[*other].insert(brick_ix);
+            }
+        }
+
+        Self {
+            supporters,
+            supporting,
+        }
     }
 }
 
 #[must_use]
-pub fn part_one(input: &str) -> Option<usize> {
-    if let Ok(mut system) = input.parse::<System>() {
-        system.settle();
-        Some(
-            system
-                .bricks
-                .len()
-                .saturating_sub(system.unremovable_brick_indices().len()),
-        )
-    } else {
+pub fn part_one(input: &str) -> Option<u32> {
+    let bricks = read_bricks(input);
+    if bricks.is_empty() {
         None
+    } else {
+        let graph = SupportGraph::from(bricks);
+        Some(graph.removable_bricks())
     }
 }
 
@@ -196,158 +183,100 @@ pub fn part_two(_input: &str) -> Option<u32> {
 mod tests {
     use super::*;
 
-    fn example_system() -> System {
-        let bricks = vec![
-            Brick {
-                cubes: vec![
-                    Cube { x: 1, y: 0, z: 1 },
-                    Cube { x: 1, y: 1, z: 1 },
-                    Cube { x: 1, y: 2, z: 1 },
-                ],
-                min_z: 1,
-            },
-            Brick {
-                cubes: vec![
-                    Cube { x: 0, y: 0, z: 2 },
-                    Cube { x: 1, y: 0, z: 2 },
-                    Cube { x: 2, y: 0, z: 2 },
-                ],
-                min_z: 2,
-            },
-            Brick {
-                cubes: vec![
-                    Cube { x: 0, y: 2, z: 3 },
-                    Cube { x: 1, y: 2, z: 3 },
-                    Cube { x: 2, y: 2, z: 3 },
-                ],
-                min_z: 3,
-            },
-            Brick {
-                cubes: vec![
-                    Cube { x: 0, y: 0, z: 4 },
-                    Cube { x: 0, y: 1, z: 4 },
-                    Cube { x: 0, y: 2, z: 4 },
-                ],
-                min_z: 4,
-            },
-            Brick {
-                cubes: vec![
-                    Cube { x: 2, y: 0, z: 5 },
-                    Cube { x: 2, y: 1, z: 5 },
-                    Cube { x: 2, y: 2, z: 5 },
-                ],
-                min_z: 5,
-            },
-            Brick {
-                cubes: vec![
-                    Cube { x: 0, y: 1, z: 6 },
-                    Cube { x: 1, y: 1, z: 6 },
-                    Cube { x: 2, y: 1, z: 6 },
-                ],
-                min_z: 6,
-            },
-            Brick {
-                cubes: vec![Cube { x: 1, y: 1, z: 8 }, Cube { x: 1, y: 1, z: 9 }],
-                min_z: 8,
-            },
-        ];
-        let mut occupied = BTreeMap::new();
-        for (ix, brick) in bricks.iter().enumerate() {
-            for cube in &brick.cubes {
-                occupied.insert(*cube, ix);
-            }
-        }
-
-        System { bricks, occupied }
+    fn example_bricks() -> Vec<Vec<usize>> {
+        vec![
+            vec![cube(1, 0, 1), cube(1, 1, 1), cube(1, 2, 1)],
+            vec![cube(0, 0, 2), cube(1, 0, 2), cube(2, 0, 2)],
+            vec![cube(0, 2, 3), cube(1, 2, 3), cube(2, 2, 3)],
+            vec![cube(0, 0, 4), cube(0, 1, 4), cube(0, 2, 4)],
+            vec![cube(2, 0, 5), cube(2, 1, 5), cube(2, 2, 5)],
+            vec![cube(0, 1, 6), cube(1, 1, 6), cube(2, 1, 6)],
+            vec![cube(1, 1, 8), cube(1, 1, 9)],
+        ]
     }
 
-    fn example_system_settled() -> System {
-        let bricks = vec![
-            Brick {
-                cubes: vec![
-                    Cube { x: 1, y: 0, z: 1 },
-                    Cube { x: 1, y: 1, z: 1 },
-                    Cube { x: 1, y: 2, z: 1 },
-                ],
-                min_z: 1,
-            },
-            Brick {
-                cubes: vec![
-                    Cube { x: 0, y: 0, z: 2 },
-                    Cube { x: 1, y: 0, z: 2 },
-                    Cube { x: 2, y: 0, z: 2 },
-                ],
-                min_z: 2,
-            },
-            Brick {
-                cubes: vec![
-                    Cube { x: 0, y: 2, z: 2 },
-                    Cube { x: 1, y: 2, z: 2 },
-                    Cube { x: 2, y: 2, z: 2 },
-                ],
-                min_z: 2,
-            },
-            Brick {
-                cubes: vec![
-                    Cube { x: 0, y: 0, z: 3 },
-                    Cube { x: 0, y: 1, z: 3 },
-                    Cube { x: 0, y: 2, z: 3 },
-                ],
-                min_z: 3,
-            },
-            Brick {
-                cubes: vec![
-                    Cube { x: 2, y: 0, z: 3 },
-                    Cube { x: 2, y: 1, z: 3 },
-                    Cube { x: 2, y: 2, z: 3 },
-                ],
-                min_z: 3,
-            },
-            Brick {
-                cubes: vec![
-                    Cube { x: 0, y: 1, z: 4 },
-                    Cube { x: 1, y: 1, z: 4 },
-                    Cube { x: 2, y: 1, z: 4 },
-                ],
-                min_z: 4,
-            },
-            Brick {
-                cubes: vec![Cube { x: 1, y: 1, z: 5 }, Cube { x: 1, y: 1, z: 6 }],
-                min_z: 5,
-            },
-        ];
-        let mut occupied = BTreeMap::new();
-        for (ix, brick) in bricks.iter().enumerate() {
-            for cube in &brick.cubes {
-                occupied.insert(*cube, ix);
-            }
-        }
+    fn example_graph() -> SupportGraph {
+        let mut supporters = Vec::new();
 
-        System { bricks, occupied }
+        let a = BTreeSet::new();
+        supporters.push(a);
+
+        let mut b = BTreeSet::new();
+        b.insert(0);
+        supporters.push(b);
+
+        let mut c = BTreeSet::new();
+        c.insert(0);
+        supporters.push(c);
+
+        let mut d = BTreeSet::new();
+        d.insert(1);
+        d.insert(2);
+        supporters.push(d);
+
+        let mut e = BTreeSet::new();
+        e.insert(1);
+        e.insert(2);
+        supporters.push(e);
+
+        let mut f = BTreeSet::new();
+        f.insert(3);
+        f.insert(4);
+        supporters.push(f);
+
+        let mut g = BTreeSet::new();
+        g.insert(5);
+        supporters.push(g);
+
+        let mut supporting = Vec::new();
+
+        let mut a = BTreeSet::new();
+        a.insert(1);
+        a.insert(2);
+        supporting.push(a);
+
+        let mut b = BTreeSet::new();
+        b.insert(3);
+        b.insert(4);
+        supporting.push(b);
+
+        let mut c = BTreeSet::new();
+        c.insert(3);
+        c.insert(4);
+        supporting.push(c);
+
+        let mut d = BTreeSet::new();
+        d.insert(5);
+        supporting.push(d);
+
+        let mut e = BTreeSet::new();
+        e.insert(5);
+        supporting.push(e);
+
+        let mut f = BTreeSet::new();
+        f.insert(6);
+        supporting.push(f);
+
+        let g = BTreeSet::new();
+        supporting.push(g);
+
+        SupportGraph {
+            supporters,
+            supporting,
+        }
     }
 
     #[test]
-    fn test_parse_system() {
+    fn test_read_bricks() {
         assert_eq!(
-            advent_of_code::template::read_file("examples", DAY).parse(),
-            Ok(example_system())
+            read_bricks(&advent_of_code::template::read_file("examples", DAY)),
+            example_bricks()
         );
     }
 
     #[test]
-    fn test_settle_system() {
-        let mut system = example_system();
-        system.settle();
-        assert_eq!(system, example_system_settled());
-    }
-
-    #[test]
-    fn test_unremovable_brick_indices() {
-        let system = example_system_settled();
-        let mut expected = BTreeSet::new();
-        expected.insert(0);
-        expected.insert(5);
-        assert_eq!(system.unremovable_brick_indices(), expected);
+    fn test_support_graph() {
+        assert_eq!(SupportGraph::from(example_bricks()), example_graph());
     }
 
     #[test]
