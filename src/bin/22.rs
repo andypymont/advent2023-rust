@@ -112,10 +112,6 @@ impl SupportGraph {
         queue.push(ix);
 
         while let Some(remove) = queue.pop() {
-            if removed.contains(&remove) {
-                continue;
-            }
-
             // record removal of the brick
             removed.insert(remove);
 
