@@ -165,7 +165,7 @@ impl City {
         state: &'a JourneyState,
         min_dist: usize,
         max_dist: usize,
-    ) -> impl Iterator<Item = JourneyState> + '_ {
+    ) -> impl Iterator<Item = JourneyState> + 'a {
         self.states_in_directions(
             state.position,
             state.heat_loss,

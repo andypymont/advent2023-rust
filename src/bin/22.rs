@@ -35,17 +35,9 @@ fn read_cube(text: &str) -> Option<(usize, usize, usize)> {
 }
 
 fn read_brick(line: &str) -> Option<Vec<usize>> {
-    let Some((first, last)) = line.split_once('~') else {
-        return None;
-    };
-
-    let Some((mut x, mut y, mut z)) = read_cube(first) else {
-        return None;
-    };
-
-    let Some((last_x, last_y, last_z)) = read_cube(last) else {
-        return None;
-    };
+    let (first, last) = line.split_once('~')?;
+    let (mut x, mut y, mut z) = read_cube(first)?;
+    let (last_x, last_y, last_z) = read_cube(last)?;
 
     if (x > last_x) || (y > last_y) || (z > last_z) {
         return None;

@@ -284,9 +284,7 @@ impl Maze {
                 steps: 0,
             }
             .cross_edge();
-            let Some(pipe) = self.grid[cross.pos] else {
-                return None;
-            };
+            let pipe = self.grid[cross.pos]?;
             cross.traverse_pipe(pipe).map(|_| edge)
         });
 

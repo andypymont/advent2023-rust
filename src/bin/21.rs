@@ -117,15 +117,9 @@ impl Grid {
         }
 
         let mut values = recorded.into_iter();
-        let Some(one) = values.next() else {
-            return None;
-        };
-        let Some(two) = values.next() else {
-            return None;
-        };
-        let Some(three) = values.next() else {
-            return None;
-        };
+        let one = values.next()?;
+        let two = values.next()?;
+        let three = values.next()?;
         Some((one, two, three))
     }
 
