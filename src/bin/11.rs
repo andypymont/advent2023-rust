@@ -78,7 +78,7 @@ impl FromStr for StarMap {
             }
         }
 
-        Ok(StarMap {
+        Ok(Self {
             stars,
             empty_rows,
             empty_cols,
@@ -88,20 +88,14 @@ impl FromStr for StarMap {
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<usize> {
-    if let Ok(starmap) = StarMap::from_str(input) {
-        Some(starmap.total_galactic_distance(2))
-    } else {
-        None
-    }
+    StarMap::from_str(input).map_or(None, |starmap| Some(starmap.total_galactic_distance(2)))
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<usize> {
-    if let Ok(starmap) = StarMap::from_str(input) {
+    StarMap::from_str(input).map_or(None, |starmap| {
         Some(starmap.total_galactic_distance(1_000_000))
-    } else {
-        None
-    }
+    })
 }
 
 #[cfg(test)]

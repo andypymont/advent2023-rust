@@ -15,7 +15,7 @@ enum Direction {
 }
 
 impl Direction {
-    fn turn_left(self) -> Self {
+    const fn turn_left(self) -> Self {
         match self {
             Self::North => Self::West,
             Self::East => Self::North,
@@ -24,7 +24,7 @@ impl Direction {
         }
     }
 
-    fn turn_right(self) -> Self {
+    const fn turn_right(self) -> Self {
         match self {
             Self::North => Self::East,
             Self::East => Self::South,
@@ -64,7 +64,8 @@ struct JourneyVisitTracker {
 }
 
 impl JourneyVisitTracker {
-    fn new() -> Self {
+    #[allow(clippy::large_stack_frames)]
+    const fn new() -> Self {
         Self {
             visited: [u32::MAX; GRID_SIZE * GRID_SIZE * 4],
         }
@@ -131,7 +132,7 @@ impl City {
             let mut states = Vec::new();
             let mut extra_loss = 0;
             for dist in 1..=max_dist {
-                if let Some(position) = City::step(position, facing, dist) {
+                if let Some(position) = Self::step(position, facing, dist) {
                     extra_loss += self.grid[position];
                     if dist >= min_dist {
                         states.push(JourneyState {
@@ -175,7 +176,7 @@ impl City {
         )
     }
 
-    fn step(pos: usize, dir: Direction, dist: usize) -> Option<usize> {
+    const fn step(pos: usize, dir: Direction, dist: usize) -> Option<usize> {
         let row = pos / GRID_SIZE;
         let col = pos % GRID_SIZE;
         match dir {
@@ -224,26 +225,18 @@ impl FromStr for City {
             }
         }
 
-        Ok(City { grid })
+        Ok(Self { grid })
     }
 }
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<u32> {
-    if let Ok(city) = City::from_str(input) {
-        city.minimal_heat_loss(1, 3)
-    } else {
-        None
-    }
+    City::from_str(input).map_or(None, |city| city.minimal_heat_loss(1, 3))
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<u32> {
-    if let Ok(city) = City::from_str(input) {
-        city.minimal_heat_loss(4, 10)
-    } else {
-        None
-    }
+    City::from_str(input).map_or(None, |city| city.minimal_heat_loss(4, 10))
 }
 
 #[cfg(test)]

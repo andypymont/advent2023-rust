@@ -1,3 +1,4 @@
+use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
@@ -82,7 +83,7 @@ struct GraphBuilder {
 }
 
 impl GraphBuilder {
-    fn new() -> Self {
+    const fn new() -> Self {
         let names = BTreeMap::new();
         let nodes = Vec::new();
         Self { names, nodes }
@@ -109,9 +110,9 @@ impl GraphBuilder {
     }
 
     fn node_ix(&mut self, name: NodeName) -> usize {
-        match self.names.get(&name) {
-            Some(existing) => *existing,
-            None => self.insert_node(name),
+        match self.names.entry(name) {
+            Entry::Vacant(_) => self.insert_node(name),
+            Entry::Occupied(v) => *v.get(),
         }
     }
 
@@ -150,16 +151,14 @@ impl FromStr for Graph {
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<usize> {
-    if let Ok(graph) = input.parse::<Graph>() {
+    Graph::from_str(input).map_or(None, |graph| {
         let (a, b) = graph.group_sizes_with_three_removed();
         Some(a * b)
-    } else {
-        None
-    }
+    })
 }
 
 #[must_use]
-pub fn part_two(_input: &str) -> Option<u32> {
+pub const fn part_two(_input: &str) -> Option<u32> {
     None
 }
 

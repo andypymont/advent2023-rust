@@ -75,7 +75,7 @@ struct Part {
 }
 
 impl Part {
-    fn get(&self, property: &Property) -> u32 {
+    const fn get(&self, property: &Property) -> u32 {
         match property {
             Property::X => self.x,
             Property::M => self.m,
@@ -88,7 +88,7 @@ impl Part {
         self.get(&workstep.property).cmp(&workstep.comparator) == workstep.comparison
     }
 
-    fn total(&self) -> u32 {
+    const fn total(&self) -> u32 {
         self.x + self.m + self.a + self.s
     }
 }
@@ -97,11 +97,11 @@ impl Part {
 struct NumberRange(u32, u32);
 
 impl NumberRange {
-    fn range(self) -> u32 {
+    const fn range(self) -> u32 {
         1 + self.1 - self.0
     }
 
-    fn split(self, comparison: Ordering, comparator: u32) -> (Option<Self>, Option<Self>) {
+    const fn split(self, comparison: Ordering, comparator: u32) -> (Option<Self>, Option<Self>) {
         let mut split: Option<Self> = None;
         let mut retain: Option<Self> = None;
 
@@ -148,7 +148,7 @@ struct PossibilityState {
 }
 
 impl Tesseract {
-    fn initial() -> Self {
+    const fn initial() -> Self {
         Self {
             x: NumberRange(1, 4000),
             m: NumberRange(1, 4000),
@@ -157,7 +157,7 @@ impl Tesseract {
         }
     }
 
-    fn get(&self, property: &Property) -> NumberRange {
+    const fn get(&self, property: &Property) -> NumberRange {
         match property {
             Property::X => self.x,
             Property::M => self.m,
@@ -166,7 +166,7 @@ impl Tesseract {
         }
     }
 
-    fn with_property_replaced(&self, property: &Property, range: NumberRange) -> Self {
+    const fn with_property_replaced(&self, property: &Property, range: NumberRange) -> Self {
         match property {
             Property::X => Self { x: range, ..*self },
             Property::M => Self { m: range, ..*self },
@@ -175,7 +175,7 @@ impl Tesseract {
         }
     }
 
-    fn split(&self, workstep: &WorkStep) -> (Option<PossibilityState>, Option<Tesseract>) {
+    fn split(&self, workstep: &WorkStep) -> (Option<PossibilityState>, Option<Self>) {
         let range = self.get(&workstep.property);
         let (split, retain) = range.split(workstep.comparison, workstep.comparator);
 
@@ -260,7 +260,7 @@ impl FromStr for WorkflowName {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut chars = s.chars();
-        Ok(WorkflowName(
+        Ok(Self(
             chars.next().unwrap_or(' '),
             chars.next().unwrap_or(' '),
             chars.next().unwrap_or(' '),
@@ -398,20 +398,12 @@ impl FromStr for WorkflowSystem {
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<u32> {
-    if let Ok(system) = WorkflowSystem::from_str(input) {
-        Some(system.total_of_accepted_parts())
-    } else {
-        None
-    }
+    WorkflowSystem::from_str(input).map_or(None, |system| Some(system.total_of_accepted_parts()))
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<u64> {
-    if let Ok(system) = WorkflowSystem::from_str(input) {
-        Some(system.accepted_possibilities())
-    } else {
-        None
-    }
+    WorkflowSystem::from_str(input).map_or(None, |system| Some(system.accepted_possibilities()))
 }
 
 #[cfg(test)]

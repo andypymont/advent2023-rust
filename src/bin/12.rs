@@ -117,7 +117,7 @@ impl FromStr for ConditionRecord {
                 groups.push(group);
             }
 
-            Ok(ConditionRecord { springs, groups })
+            Ok(Self { springs, groups })
         } else {
             Err(ParseConditionRecordError)
         }
@@ -127,15 +127,14 @@ impl FromStr for ConditionRecord {
 fn total_possible_arrangements(input: &str, unfold: bool) -> u64 {
     input
         .lines()
-        .map(|line| match line.parse::<ConditionRecord>() {
-            Ok(record) => {
+        .map(|line| {
+            line.parse::<ConditionRecord>().map_or(0, |record| {
                 if unfold {
                     record.unfold().possible_arrangements()
                 } else {
                     record.possible_arrangements()
                 }
-            }
-            Err(_) => 0,
+            })
         })
         .sum()
 }

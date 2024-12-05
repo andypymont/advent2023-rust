@@ -13,5 +13,9 @@ doctest = false
 [features]
 test_lib = []
 
+[lints.clippy]
+pedantic = "warn"
+nursery = "warn"
+
 [dependencies]
 pico-args = "0.5.0"

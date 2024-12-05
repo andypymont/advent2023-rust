@@ -12,10 +12,15 @@ use super::ANSI_BOLD;
 pub fn run_part<I: Clone, T: Display>(func: impl Fn(I) -> Option<T>, input: I, day: Day, part: u8) {
     let part_str = format!("Part {part}");
 
-    let (result, duration, samples) =
-        run_timed(func, input, |result| print_result(result, &part_str, ""));
+    let (result, duration, samples) = run_timed(func, input, |result| {
+        print_result(result.as_ref(), &part_str, "")
+    });
 
-    print_result(&result, &part_str, &format_duration(&duration, samples));
+    print_result(
+        result.as_ref(),
+        &part_str,
+        &format_duration(&duration, samples),
+    );
 
     if let Some(result) = result {
         submit_result(result, day, part);
@@ -87,7 +92,7 @@ fn format_duration(duration: &Duration, samples: u128) -> String {
     }
 }
 
-fn print_result<T: Display>(result: &Option<T>, part: &str, duration_str: &str) {
+fn print_result<T: Display>(result: Option<&T>, part: &str, duration_str: &str) {
     let is_intermediate_result = duration_str.is_empty();
 
     match result {

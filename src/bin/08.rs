@@ -46,7 +46,7 @@ struct Node {
 }
 
 impl Node {
-    fn step(&self, direction: &Direction) -> Location {
+    const fn step(&self, direction: &Direction) -> Location {
         match direction {
             Direction::Left => self.left,
             Direction::Right => self.right,
@@ -133,7 +133,7 @@ impl FromStr for Network {
     }
 }
 
-fn gcd(a: usize, b: usize) -> usize {
+const fn gcd(a: usize, b: usize) -> usize {
     let mut a = a;
     let mut b = b;
 
@@ -159,7 +159,7 @@ fn gcd(a: usize, b: usize) -> usize {
     }
 }
 
-fn lcm(a: usize, b: usize) -> usize {
+const fn lcm(a: usize, b: usize) -> usize {
     if a == 0 && b == 0 {
         0
     } else {
@@ -169,20 +169,12 @@ fn lcm(a: usize, b: usize) -> usize {
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<usize> {
-    if let Ok(network) = Network::from_str(input) {
-        network.find_path_length(['A', 'A', 'A'])
-    } else {
-        None
-    }
+    Network::from_str(input).map_or(None, |network| network.find_path_length(['A', 'A', 'A']))
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<usize> {
-    if let Ok(network) = Network::from_str(input) {
-        network.find_all_path_lengths().reduce(lcm)
-    } else {
-        None
-    }
+    Network::from_str(input).map_or(None, |network| network.find_all_path_lengths().reduce(lcm))
 }
 
 #[cfg(test)]

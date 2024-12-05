@@ -10,7 +10,7 @@ struct Draw {
 }
 
 impl Draw {
-    fn power(&self) -> u32 {
+    const fn power(&self) -> u32 {
         self.red * self.green * self.blue
     }
 }
@@ -72,7 +72,7 @@ impl FromStr for Draw {
             }
         }
 
-        Ok(Draw { red, green, blue })
+        Ok(Self { red, green, blue })
     }
 }
 
@@ -90,7 +90,7 @@ impl FromStr for Game {
                     draws.push(draw);
                 }
 
-                Ok(Game { id, draws })
+                Ok(Self { id, draws })
             } else {
                 Err(ParseGameError)
             }
@@ -130,10 +130,7 @@ pub fn part_two(input: &str) -> Option<u32> {
     Some(
         input
             .lines()
-            .filter_map(|line| match line.parse::<Game>() {
-                Ok(game) => Some(game.power()),
-                Err(_) => None,
-            })
+            .filter_map(|line| Game::from_str(line).map_or(None, |game| Some(game.power())))
             .sum(),
     )
 }

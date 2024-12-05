@@ -178,7 +178,7 @@ impl FromStr for Grid {
     }
 }
 
-fn solve_quadratic(sample1: usize, sample2: usize, sample3: usize, n: usize) -> usize {
+const fn solve_quadratic(sample1: usize, sample2: usize, sample3: usize, n: usize) -> usize {
     let a = (sample3 - (2 * sample2) + sample1) / 2;
     let b = sample2 - sample1 - a;
     let c = sample1;
@@ -187,25 +187,19 @@ fn solve_quadratic(sample1: usize, sample2: usize, sample3: usize, n: usize) -> 
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<usize> {
-    if let Ok(grid) = Grid::from_str(input) {
-        Some(grid.reachable_in_steps(64))
-    } else {
-        None
-    }
+    Grid::from_str(input).map_or(None, |grid| Some(grid.reachable_in_steps(64)))
 }
 
 const GOAL: usize = 26_501_365;
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<usize> {
-    if let Ok(grid) = Grid::from_str(input) {
+    Grid::from_str(input).map_or(None, |grid| {
         let size = grid.size;
         grid.expanded()
             .reachable_in_key_step_counts(size)
             .map(|(a, b, c)| solve_quadratic(a, b, c, (GOAL - (size / 2)) / size))
-    } else {
-        None
-    }
+    })
 }
 
 #[cfg(test)]

@@ -35,7 +35,7 @@ enum Gear {
 }
 
 impl Gear {
-    fn connect(self, part_no: u32) -> Self {
+    const fn connect(self, part_no: u32) -> Self {
         match self {
             Self::Empty => Self::Single(part_no),
             Self::Single(ratio) => Self::Valid(ratio * part_no),
@@ -124,26 +124,18 @@ impl FromStr for Schematic {
             }
         }
 
-        Ok(Schematic { symbols, parts })
+        Ok(Self { symbols, parts })
     }
 }
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<u32> {
-    if let Ok(schematic) = input.parse::<Schematic>() {
-        Some(schematic.part_numbers().sum())
-    } else {
-        None
-    }
+    Schematic::from_str(input).map_or(None, |schematic| Some(schematic.part_numbers().sum()))
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<u32> {
-    if let Ok(schematic) = input.parse::<Schematic>() {
-        Some(schematic.total_gear_ratio())
-    } else {
-        None
-    }
+    Schematic::from_str(input).map_or(None, |schematic| Some(schematic.total_gear_ratio()))
 }
 
 #[cfg(test)]

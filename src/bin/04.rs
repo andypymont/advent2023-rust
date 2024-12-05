@@ -46,7 +46,7 @@ impl FromStr for Scratchcard {
             if let Some((winners_str, numbers_str)) = all_numbers.split_once(" | ") {
                 let winners = parse_number_list(winners_str)?;
                 let numbers = parse_number_list(numbers_str)?;
-                Ok(Scratchcard { winners, numbers })
+                Ok(Self { winners, numbers })
             } else {
                 Err(ParseScratchcardError)
             }

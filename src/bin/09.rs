@@ -6,7 +6,7 @@ advent_of_code::solution!(9);
 struct Sequence(Vec<i32>);
 
 impl Sequence {
-    fn empty() -> Self {
+    const fn empty() -> Self {
         Self(Vec::new())
     }
 
@@ -49,7 +49,7 @@ impl FromStr for Sequence {
             let num: i32 = num_str.parse().map_err(|_| ParseSequenceError)?;
             numbers.push(num);
         }
-        Ok(Sequence(numbers))
+        Ok(Self(numbers))
     }
 }
 

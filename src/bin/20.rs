@@ -57,7 +57,7 @@ struct Signal {
 }
 
 impl Signal {
-    fn initial() -> Self {
+    const fn initial() -> Self {
         Self {
             pulse: Pulse::Low,
             destination: ModuleName::Broadcaster,
@@ -70,7 +70,7 @@ struct ModuleSystem {
     modules: HashMap<ModuleName, Module>,
 }
 
-fn gcd(a: u64, b: u64) -> u64 {
+const fn gcd(a: u64, b: u64) -> u64 {
     let mut a = a;
     let mut b = b;
 
@@ -96,7 +96,7 @@ fn gcd(a: u64, b: u64) -> u64 {
     }
 }
 
-fn lcm(a: u64, b: u64) -> u64 {
+const fn lcm(a: u64, b: u64) -> u64 {
     if a == 0 && b == 0 {
         0
     } else {
@@ -285,29 +285,29 @@ impl FromStr for ModuleSystem {
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<u32> {
-    if let Ok(system) = ModuleSystem::from_str(input) {
+    ModuleSystem::from_str(input).map_or(None, |system| {
         let (low, high) = system.press_button_times(1000);
         Some(low * high)
-    } else {
-        None
-    }
+    })
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<u64> {
-    if let Ok(system) = ModuleSystem::from_str(input) {
+    ModuleSystem::from_str(input).map_or(None, |system| {
         let seek = ModuleName::Other('r', 'x');
-        if let Some(module) = system
-            .modules
-            .values()
-            .find(|m| m.destinations.contains(&seek))
-        {
-            if let ModuleType::Conjunction(sources) = &module.modtype {
-                return Some(system.find_lcm_of_signals_to_destinations(sources));
+        system.modules.values().find_map(|m| {
+            if m.destinations.contains(&seek) {
+                match &m.modtype {
+                    ModuleType::Conjunction(sources) => {
+                        Some(system.find_lcm_of_signals_to_destinations(sources))
+                    }
+                    ModuleType::Broadcaster | ModuleType::FlipFlop => None,
+                }
+            } else {
+                None
             }
-        }
-    }
-    None
+        })
+    })
 }
 
 #[cfg(test)]

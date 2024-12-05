@@ -7,7 +7,7 @@ struct Race {
 }
 
 impl Race {
-    fn times_that_beat_record(&self) -> u64 {
+    const fn times_that_beat_record(&self) -> u64 {
         let mut left = 0;
         let mut right = self.time / 2;
 
@@ -85,20 +85,14 @@ fn read_single_race(input: &str) -> Result<Race, ParseRacesError> {
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<u64> {
-    if let Ok(races) = read_races(input) {
+    read_races(input).map_or(None, |races| {
         Some(races.iter().map(Race::times_that_beat_record).product())
-    } else {
-        None
-    }
+    })
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<u64> {
-    if let Ok(race) = read_single_race(input) {
-        Some(race.times_that_beat_record())
-    } else {
-        None
-    }
+    read_single_race(input).map_or(None, |race| Some(race.times_that_beat_record()))
 }
 
 #[cfg(test)]

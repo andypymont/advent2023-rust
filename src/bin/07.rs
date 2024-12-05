@@ -24,23 +24,23 @@ impl HandType {
         });
 
         match max + counts[0] {
-            5 => HandType::FiveOfAKind,
-            4 => HandType::FourOfAKind,
+            5 => Self::FiveOfAKind,
+            4 => Self::FourOfAKind,
             3 => {
                 if values == 2 {
-                    HandType::FullHouse
+                    Self::FullHouse
                 } else {
-                    HandType::ThreeOfAKind
+                    Self::ThreeOfAKind
                 }
             }
             2 => {
                 if values == 3 {
-                    HandType::TwoPair
+                    Self::TwoPair
                 } else {
-                    HandType::OnePair
+                    Self::OnePair
                 }
             }
-            _ => HandType::HighCard,
+            _ => Self::HighCard,
         }
     }
 }
@@ -93,7 +93,7 @@ impl FromStr for Hand {
             let bid = bid_str.parse().map_err(|_| ParseHandError)?;
             let htype = HandType::from_cards(cards);
 
-            Ok(Hand { htype, cards, bid })
+            Ok(Self { htype, cards, bid })
         } else {
             Err(ParseHandError)
         }
@@ -115,7 +115,7 @@ fn read_joker_hands(input: &str) -> Result<Vec<Hand>, ParseHandError> {
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<usize> {
-    if let Ok(mut hands) = read_hands(input) {
+    read_hands(input).map_or(None, |mut hands| {
         hands.sort_unstable();
         Some(
             hands
@@ -124,14 +124,12 @@ pub fn part_one(input: &str) -> Option<usize> {
                 .map(|(ix, hand)| (ix + 1) * hand.bid)
                 .sum(),
         )
-    } else {
-        None
-    }
+    })
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<usize> {
-    if let Ok(mut hands) = read_joker_hands(input) {
+    read_joker_hands(input).map_or(None, |mut hands| {
         hands.sort_unstable();
         Some(
             hands
@@ -140,9 +138,7 @@ pub fn part_two(input: &str) -> Option<usize> {
                 .map(|(ix, hand)| (ix + 1) * hand.bid)
                 .sum(),
         )
-    } else {
-        None
-    }
+    })
 }
 
 #[cfg(test)]

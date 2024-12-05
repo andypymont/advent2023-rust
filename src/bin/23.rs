@@ -29,7 +29,7 @@ struct GraphMappingState {
 }
 
 impl GraphMappingState {
-    fn new(position: usize) -> Self {
+    const fn new(position: usize) -> Self {
         let mut visited = [false; GRID_SIZE * GRID_SIZE];
         visited[position] = true;
         Self {
@@ -40,7 +40,7 @@ impl GraphMappingState {
         }
     }
 
-    fn visit(&self, position: usize) -> Self {
+    const fn visit(&self, position: usize) -> Self {
         let mut visited = self.visited;
         visited[position] = true;
         Self {
@@ -56,12 +56,12 @@ impl GraphMappingState {
 struct BitSet(usize);
 
 impl BitSet {
-    fn contains(self, pos: usize) -> bool {
+    const fn contains(self, pos: usize) -> bool {
         let flag = 1 << pos;
         self.0 & flag != 0
     }
 
-    fn insert(self, pos: usize) -> Self {
+    const fn insert(self, pos: usize) -> Self {
         let flag = 1 << pos;
         Self(self.0 | flag)
     }
@@ -75,7 +75,7 @@ struct HikeState {
 }
 
 impl HikeState {
-    fn new(position: usize) -> Self {
+    const fn new(position: usize) -> Self {
         Self {
             position,
             steps: 0,
@@ -83,7 +83,7 @@ impl HikeState {
         }
     }
 
-    fn visit(&self, position: usize, steps: u32) -> Self {
+    const fn visit(&self, position: usize, steps: u32) -> Self {
         Self {
             position,
             steps: self.steps + steps,
@@ -126,10 +126,7 @@ impl TrailGraph {
 
         while let Some(state) = queue.pop() {
             if state.position == self.finish {
-                longest = match longest {
-                    Some(steps) => Some(steps.max(state.steps)),
-                    None => Some(state.steps),
-                }
+                longest = longest.map_or(Some(state.steps), |steps| Some(steps.max(state.steps)));
             } else if let Some(node) = self.nodes.get(state.position) {
                 for (position, steps) in node.iter().enumerate() {
                     let Some(steps) = steps else {
@@ -235,7 +232,7 @@ impl TrailMap {
         graph
     }
 
-    fn step_in_direction(pos: usize, direction: Direction) -> Option<usize> {
+    const fn step_in_direction(pos: usize, direction: Direction) -> Option<usize> {
         let row = pos / GRID_SIZE;
         let col = pos % GRID_SIZE;
 
@@ -313,22 +310,18 @@ impl FromStr for TrailMap {
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<u32> {
-    if let Ok(trail_map) = TrailMap::from_str(input) {
+    TrailMap::from_str(input).map_or(None, |trail_map| {
         let graph = trail_map.graph(false);
         graph.longest_hike()
-    } else {
-        None
-    }
+    })
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<u32> {
-    if let Ok(trail_map) = TrailMap::from_str(input) {
+    TrailMap::from_str(input).map_or(None, |trail_map| {
         let graph = trail_map.graph(true);
         graph.longest_hike()
-    } else {
-        None
-    }
+    })
 }
 
 #[cfg(test)]

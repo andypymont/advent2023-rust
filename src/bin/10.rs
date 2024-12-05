@@ -34,7 +34,7 @@ impl Pipe {
         }
     }
 
-    fn read_from_char(ch: char) -> Option<Self> {
+    const fn read_from_char(ch: char) -> Option<Self> {
         match ch {
             '|' => Some(Self(Direction::North, Direction::South)),
             '-' => Some(Self(Direction::East, Direction::West)),
@@ -55,7 +55,7 @@ struct EdgePosition {
 }
 
 impl EdgePosition {
-    fn cross_edge(&self) -> Self {
+    const fn cross_edge(&self) -> Self {
         match self.edge {
             Direction::North => Self {
                 pos: self.pos - GRID_SIZE,
@@ -98,18 +98,18 @@ enum Corner {
 }
 
 impl Corner {
-    fn move_crosses(self, direction: Direction) -> Option<Direction> {
+    const fn move_crosses(self, direction: Direction) -> Option<Direction> {
         match (self, direction) {
-            (Corner::TopLeft, Direction::East) | (Corner::TopRight, Direction::West) => {
+            (Self::TopLeft, Direction::East) | (Self::TopRight, Direction::West) => {
                 Some(Direction::North)
             }
-            (Corner::TopLeft, Direction::South) | (Corner::BottomLeft, Direction::North) => {
+            (Self::TopLeft, Direction::South) | (Self::BottomLeft, Direction::North) => {
                 Some(Direction::West)
             }
-            (Corner::TopRight, Direction::South) | (Corner::BottomRight, Direction::North) => {
+            (Self::TopRight, Direction::South) | (Self::BottomRight, Direction::North) => {
                 Some(Direction::East)
             }
-            (Corner::BottomLeft, Direction::East) | (Corner::BottomRight, Direction::West) => {
+            (Self::BottomLeft, Direction::East) | (Self::BottomRight, Direction::West) => {
                 Some(Direction::South)
             }
             _ => None,
@@ -124,7 +124,7 @@ struct CornerPosition {
 }
 
 impl CornerPosition {
-    fn adjacent_positions<'a>(&'a self, pipe: &'a Option<Pipe>) -> impl Iterator<Item = Self> + 'a {
+    fn adjacent_positions<'a>(&'a self, pipe: Option<&'a Pipe>) -> impl Iterator<Item = Self> + 'a {
         // calculate adjacent locations, accounting for OOB
         let north = self.pos.checked_sub(GRID_SIZE);
         let east = if (self.pos % GRID_SIZE) == (GRID_SIZE - 1) {
@@ -216,7 +216,7 @@ impl CornerPosition {
 struct CornerVisitTracker([u8; GRID_SIZE * GRID_SIZE]);
 
 impl CornerVisitTracker {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self([0; GRID_SIZE * GRID_SIZE])
     }
 
@@ -314,7 +314,7 @@ impl Maze {
                 } else {
                     self.grid[pos.pos]
                 };
-                queue.extend(pos.adjacent_positions(&pipe));
+                queue.extend(pos.adjacent_positions(pipe.as_ref()));
             }
         }
 
@@ -349,20 +349,12 @@ impl FromStr for Maze {
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<u32> {
-    if let Ok(maze) = Maze::from_str(input) {
-        maze.furthest_point_in_loop()
-    } else {
-        None
-    }
+    Maze::from_str(input).map_or(None, |maze| maze.furthest_point_in_loop())
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<u32> {
-    if let Ok(maze) = Maze::from_str(input) {
-        Some(maze.spaces_enclosed_by_loop())
-    } else {
-        None
-    }
+    Maze::from_str(input).map_or(None, |maze| Some(maze.spaces_enclosed_by_loop()))
 }
 
 #[cfg(test)]
@@ -456,7 +448,7 @@ mod tests {
         };
         let pipe = Some(Pipe(Direction::East, Direction::South));
         assert_eq!(
-            pos.adjacent_positions(&pipe)
+            pos.adjacent_positions(pipe.as_ref())
                 .collect::<Vec<CornerPosition>>(),
             vec![
                 CornerPosition {
@@ -476,7 +468,7 @@ mod tests {
         };
         let pipe = Some(Pipe(Direction::East, Direction::West));
         assert_eq!(
-            pos.adjacent_positions(&pipe)
+            pos.adjacent_positions(pipe.as_ref())
                 .collect::<Vec<CornerPosition>>(),
             vec![
                 CornerPosition {
@@ -500,7 +492,7 @@ mod tests {
         };
         let pipe = None;
         assert_eq!(
-            pos.adjacent_positions(&pipe)
+            pos.adjacent_positions(pipe.as_ref())
                 .collect::<Vec<CornerPosition>>(),
             vec![
                 CornerPosition {

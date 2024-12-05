@@ -74,7 +74,7 @@ impl Dish {
             }
         }
 
-        Dish { grid: rolled }
+        Self { grid: rolled }
     }
 
     fn roll_north(&self) -> Self {
@@ -97,7 +97,7 @@ impl Dish {
             }
         }
 
-        Dish { grid: rolled }
+        Self { grid: rolled }
     }
 
     fn roll_south(&self) -> Self {
@@ -120,7 +120,7 @@ impl Dish {
             }
         }
 
-        Dish { grid: rolled }
+        Self { grid: rolled }
     }
 
     fn roll_west(&self) -> Self {
@@ -143,7 +143,7 @@ impl Dish {
             }
         }
 
-        Dish { grid: rolled }
+        Self { grid: rolled }
     }
 
     fn tilt_cycle(&self) -> Self {
@@ -180,26 +180,20 @@ impl FromStr for Dish {
             }
         }
 
-        Ok(Dish { grid })
+        Ok(Self { grid })
     }
 }
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<usize> {
-    if let Ok(dish) = Dish::from_str(input) {
+    Dish::from_str(input).map_or(None, |dish| {
         Some(dish.roll_north().load_on_north_support_beams())
-    } else {
-        None
-    }
+    })
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<usize> {
-    if let Ok(dish) = Dish::from_str(input) {
-        Some(dish.load_after_cycles(1_000_000_000))
-    } else {
-        None
-    }
+    Dish::from_str(input).map_or(None, |dish| Some(dish.load_after_cycles(1_000_000_000)))
 }
 
 #[cfg(test)]

@@ -11,7 +11,7 @@ struct AlmanacMapEntry {
 }
 
 impl AlmanacMapEntry {
-    fn convert(&self, source: u64) -> Option<u64> {
+    const fn convert(&self, source: u64) -> Option<u64> {
         if self.source_start <= source && source < (self.source_start + self.length) {
             Some(source - self.source_start + self.dest_start)
         } else {
@@ -31,15 +31,11 @@ struct ValueRange {
 
 impl AlmanacMap {
     fn convert(&self, source: u64) -> u64 {
-        match self
-            .0
+        self.0
             .iter()
             .map(|entry| entry.convert(source))
             .find_map(|e| e)
-        {
-            Some(dest) => dest,
-            None => source,
-        }
+            .unwrap_or(source)
     }
 
     fn convert_range(&self, range: &ValueRange) -> Vec<ValueRange> {
@@ -171,7 +167,7 @@ impl FromStr for AlmanacMapEntry {
         let source_start = source_start?;
         let length = length?;
 
-        Ok(AlmanacMapEntry {
+        Ok(Self {
             dest_start,
             source_start,
             length,

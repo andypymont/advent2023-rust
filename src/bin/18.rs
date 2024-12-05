@@ -88,13 +88,13 @@ impl Instruction {
 struct Point(i64, i64);
 
 impl Point {
-    fn distance(self, other: Point) -> u64 {
+    const fn distance(self, other: Self) -> u64 {
         self.0.abs_diff(other.0) + self.1.abs_diff(other.1)
     }
 }
 
 impl Add<&Instruction> for Point {
-    type Output = Point;
+    type Output = Self;
 
     fn add(self, rhs: &Instruction) -> Self::Output {
         match rhs.direction {
@@ -179,11 +179,8 @@ pub fn part_one(input: &str) -> Option<u64> {
     let Ok(instructions) = read_instructions(input, false) else {
         return None;
     };
-    if let Ok(polygon) = Polygon::from_instructions(&instructions) {
-        Some(polygon.area_including_circumference())
-    } else {
-        None
-    }
+    Polygon::from_instructions(&instructions)
+        .map_or(None, |polygon| Some(polygon.area_including_circumference()))
 }
 
 #[must_use]
@@ -191,11 +188,8 @@ pub fn part_two(input: &str) -> Option<u64> {
     let Ok(instructions) = read_instructions(input, true) else {
         return None;
     };
-    if let Ok(polygon) = Polygon::from_instructions(&instructions) {
-        Some(polygon.area_including_circumference())
-    } else {
-        None
-    }
+    Polygon::from_instructions(&instructions)
+        .map_or(None, |polygon| Some(polygon.area_including_circumference()))
 }
 
 #[cfg(test)]

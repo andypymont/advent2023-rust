@@ -40,7 +40,7 @@ impl FromStr for Point2D {
 
         let x = x?;
         let y = y?;
-        Ok(Point2D(x, y))
+        Ok(Self(x, y))
     }
 }
 
@@ -51,7 +51,7 @@ impl FromStr for Hailstone2D {
         if let Some((position, velocity)) = text.split_once(" @ ") {
             let position = position.parse()?;
             let velocity = velocity.parse()?;
-            Ok(Hailstone2D { position, velocity })
+            Ok(Self { position, velocity })
         } else {
             Err(ParseHailstoneError)
         }
@@ -59,7 +59,7 @@ impl FromStr for Hailstone2D {
 }
 
 impl Hailstone2D {
-    fn intersection(&self, other: &Self) -> Intersection {
+    const fn intersection(&self, other: &Self) -> Intersection {
         if self.velocity.0 == 0 && self.velocity.1 == 0 {
             return Intersection::None;
         }
@@ -114,11 +114,11 @@ struct TestArea {
 }
 
 impl TestArea {
-    fn is_value_in_range(&self, value: i64) -> bool {
+    const fn is_value_in_range(&self, value: i64) -> bool {
         (value >= self.min) && (value <= self.max)
     }
 
-    fn contains(&self, intersection: &Intersection) -> bool {
+    const fn contains(&self, intersection: &Intersection) -> bool {
         match intersection {
             Intersection::None | Intersection::Past => false,
             Intersection::Future { x, y } => {
@@ -140,7 +140,7 @@ fn intersecting_pairs_in_area(hailstones: &[Hailstone2D], area: &TestArea) -> u3
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<u32> {
-    if let Ok(hailstones) = read_hailstones_2d(input) {
+    read_hailstones_2d(input).map_or(None, |hailstones| {
         Some(intersecting_pairs_in_area(
             &hailstones,
             &TestArea {
@@ -148,9 +148,7 @@ pub fn part_one(input: &str) -> Option<u32> {
                 max: 400_000_000_000_000,
             },
         ))
-    } else {
-        None
-    }
+    })
 }
 
 #[must_use]

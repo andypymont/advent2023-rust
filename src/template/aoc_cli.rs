@@ -17,12 +17,12 @@ pub enum AocCommandError {
 impl Display for AocCommandError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AocCommandError::CommandNotFound => write!(f, "aoc-cli is not present in environment."),
-            AocCommandError::CommandNotCallable => write!(f, "aoc-cli could not be called."),
-            AocCommandError::BadExitStatus(_) => {
+            Self::CommandNotFound => write!(f, "aoc-cli is not present in environment."),
+            Self::CommandNotCallable => write!(f, "aoc-cli could not be called."),
+            Self::BadExitStatus(_) => {
                 write!(f, "aoc-cli exited with a non-zero status.")
             }
-            AocCommandError::IoError => write!(f, "could not write output files to file system."),
+            Self::IoError => write!(f, "could not write output files to file system."),
         }
     }
 }
@@ -111,10 +111,7 @@ fn get_puzzle_path(day: Day) -> String {
 }
 
 fn get_year() -> Option<u16> {
-    match std::env::var("AOC_YEAR") {
-        Ok(x) => x.parse().ok().or(None),
-        Err(_) => None,
-    }
+    std::env::var("AOC_YEAR").map_or(None, |x| x.parse().ok().or(None))
 }
 
 fn build_args(command: &str, args: &[String], day: Day) -> Vec<String> {

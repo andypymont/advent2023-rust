@@ -82,10 +82,7 @@ fn calibration_value(line: &str, include_words: bool) -> usize {
         }
     }
 
-    match first {
-        None => 0,
-        Some(first) => (first * 10) + latest,
-    }
+    first.map_or(0, |first| (first * 10) + latest)
 }
 
 #[must_use]

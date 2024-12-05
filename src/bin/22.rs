@@ -6,7 +6,7 @@ advent_of_code::solution!(22);
 const GRID_SIZE: usize = 10;
 const GRID_HEIGHT: usize = 310;
 
-fn cube(x: usize, y: usize, z: usize) -> usize {
+const fn cube(x: usize, y: usize, z: usize) -> usize {
     (z * GRID_SIZE * GRID_SIZE) + (y * GRID_SIZE) + x
 }
 
@@ -16,10 +16,7 @@ fn read_cube(text: &str) -> Option<(usize, usize, usize)> {
     let mut z: Option<usize> = None;
 
     for (ix, part) in text.split(',').enumerate() {
-        let value = match part.parse() {
-            Ok(v) => Some(v),
-            Err(_) => None,
-        };
+        let value = part.parse().ok();
         match ix {
             0 => x = value,
             1 => y = value,

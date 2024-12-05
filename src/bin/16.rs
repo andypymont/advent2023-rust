@@ -14,7 +14,7 @@ enum Direction {
 }
 
 impl Direction {
-    fn is_vertical(self) -> bool {
+    const fn is_vertical(self) -> bool {
         match self {
             Self::North | Self::South => true,
             Self::East | Self::West => false,
@@ -29,7 +29,7 @@ enum MirrorType {
 }
 
 impl MirrorType {
-    fn next_directions(self, current: Direction) -> (Option<Direction>, Option<Direction>) {
+    const fn next_directions(self, current: Direction) -> (Option<Direction>, Option<Direction>) {
         let nd = match (self, current) {
             (Self::Forwardslash, Direction::North) | (Self::Backslash, Direction::South) => {
                 Direction::East
@@ -55,7 +55,7 @@ enum SplitterType {
 }
 
 impl SplitterType {
-    fn next_directions(self, current: Direction) -> (Option<Direction>, Option<Direction>) {
+    const fn next_directions(self, current: Direction) -> (Option<Direction>, Option<Direction>) {
         match (self, current.is_vertical()) {
             (Self::Vertical, false) => (Some(Direction::North), Some(Direction::South)),
             (Self::Horizontal, true) => (Some(Direction::West), Some(Direction::East)),
@@ -72,7 +72,7 @@ enum Space {
 }
 
 impl Space {
-    fn next_directions(self, current: Direction) -> (Option<Direction>, Option<Direction>) {
+    const fn next_directions(self, current: Direction) -> (Option<Direction>, Option<Direction>) {
         match self {
             Self::Mirror(mirror_type) => mirror_type.next_directions(current),
             Self::Splitter(splitter_type) => splitter_type.next_directions(current),
@@ -87,7 +87,7 @@ struct EnergisationTracker {
 }
 
 impl EnergisationTracker {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             grid: [0; GRID_SIZE * GRID_SIZE],
         }
@@ -116,7 +116,7 @@ struct Contraption {
 }
 
 impl Contraption {
-    fn step(pos: usize, dir: Direction) -> Option<usize> {
+    const fn step(pos: usize, dir: Direction) -> Option<usize> {
         let row = pos / GRID_SIZE;
         let col = pos % GRID_SIZE;
 
@@ -207,11 +207,11 @@ impl TryFrom<char> for Space {
 
     fn try_from(value: char) -> Result<Self, Self::Error> {
         match value {
-            '.' => Ok(Space::Empty),
-            '\\' => Ok(Space::Mirror(MirrorType::Backslash)),
-            '/' => Ok(Space::Mirror(MirrorType::Forwardslash)),
-            '|' => Ok(Space::Splitter(SplitterType::Vertical)),
-            '-' => Ok(Space::Splitter(SplitterType::Horizontal)),
+            '.' => Ok(Self::Empty),
+            '\\' => Ok(Self::Mirror(MirrorType::Backslash)),
+            '/' => Ok(Self::Mirror(MirrorType::Forwardslash)),
+            '|' => Ok(Self::Splitter(SplitterType::Vertical)),
+            '-' => Ok(Self::Splitter(SplitterType::Horizontal)),
             _ => Err(ParseContraptionError),
         }
     }
@@ -236,20 +236,14 @@ impl FromStr for Contraption {
 
 #[must_use]
 pub fn part_one(input: &str) -> Option<usize> {
-    if let Ok(contraption) = Contraption::from_str(input) {
-        Some(contraption.energised_cells(0, Direction::East))
-    } else {
-        None
-    }
+    Contraption::from_str(input).map_or(None, |contrap| {
+        Some(contrap.energised_cells(0, Direction::East))
+    })
 }
 
 #[must_use]
 pub fn part_two(input: &str) -> Option<usize> {
-    if let Ok(contraption) = Contraption::from_str(input) {
-        Some(contraption.most_energised_cells())
-    } else {
-        None
-    }
+    Contraption::from_str(input).map_or(None, |contrap| Some(contrap.most_energised_cells()))
 }
 
 #[cfg(test)]
